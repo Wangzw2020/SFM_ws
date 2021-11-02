@@ -1,3 +1,6 @@
+#ifndef MAP_H
+#define MAP_H
+
 #include <vector>
 #include "tools.h"
 
@@ -18,24 +21,35 @@ private:
 	Line sep_;	
 public:
 	Seperator(float x1, float y1, float x2, float y2);
-	
 	Point getStartPoint() { return sep_.start; }
 	Point getEndPoint() { return sep_.end; }
 };
 
 class Zebra{
 private:
+	static int zebraIdx;
+	int yaw_;				//0为纵向 1为横向
+	int zebra_id_;
 	Point position_;
 	float length_, width_, interval_;
+	int num_;
 	Color color_;
 public:
-	Zebra(float x, float y);
+	Zebra(float x, float y, int yaw);
+	void setYaw(float yaw);
+	int getId() { return zebra_id_; }
+	int getYaw() { return yaw_; }
 	Point getPosition() { return position_; }
 	float getLength() { return length_; }
 	float getWidth() { return width_; }
+	Point getLeftDown();
+	Point getRightUp();
 	float getInterval() { return interval_; }
+	int getNum() { return num_; }
 	Color getColor() { return color_; }
 };
+
+int Zebra::zebraIdx = -1;
 
 class Environment{
 private:
@@ -101,15 +115,56 @@ Seperator::Seperator(float x1, float y1, float x2, float y2)
 	sep_.end = setPoint(x2, y2, 0.0);
 }
 
-Zebra::Zebra(float x, float y)
+Zebra::Zebra(float x, float y, int yaw)
 {
+	zebra_id_ = ++zebraIdx;
 	position_ = setPoint(x, y, 0.0);
+	yaw_ = yaw;
 	color_.r = 150.0 / 255.0;
 	color_.g = 150.0 / 255.0;
 	color_.b = 150.0 / 255.0;
 	length_ = 4.0F;
 	width_ = 0.4F;
 	interval_ = 0.4F;
+	num_ = 8;
+}
+
+void Zebra::setYaw(float yaw)
+{
+	yaw_ = yaw;
+}
+
+Point Zebra::getLeftDown()
+{
+	Point p;
+	if (yaw_ == 0)
+	{
+		p.x = position_.x - length_/2;
+		p.y = position_.y - interval_ * num_ + width_ * num_ + width_/2;
+	}
+	else if (yaw_ == 1)
+	{
+		p.x = position_.x - interval_ * num_ + width_ * num_ + width_/2;
+		p.y = position_.y - length_/2;
+	}
+	p.z = 0.02;
+	return p;
+}
+Point Zebra::getRightUp()
+{
+	Point p;
+	if (yaw_ == 0)
+	{
+		p.x = position_.x + length_/2;
+		p.y = position_.y + interval_ * num_ + width_ * num_ + width_/2;
+	}
+	else if (yaw_ == 1)
+	{
+		p.x = position_.x + interval_ * num_ + width_ * num_ + width_/2;
+		p.y = position_.y + length_/2;
+	}
+	p.z = 0.02;
+	return p;
 }
 
 Environment::~Environment()
@@ -154,3 +209,5 @@ void Environment::removeZebras()
 		delete zebras_[i];
 	zebras_.clear();
 }
+
+#endif

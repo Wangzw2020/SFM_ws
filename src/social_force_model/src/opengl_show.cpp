@@ -8,8 +8,6 @@
 
 using namespace std;
 
-const float PI = 3.1415925359F;
-
 string map_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/map.txt";
 string ped_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped.txt";
 string vehicle_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/vehicle.txt";
@@ -110,6 +108,7 @@ void loadMap()
 	{
 		string type;
 		float x1, y1, x2, y2;
+		int yaw;
 		getline(map_file,line);
 		if (line.length() == 0)
 			break;
@@ -130,8 +129,8 @@ void loadMap()
 		}
 		else if (type == "zebra")
 		{
-			ss>>x1>>y1;
-			zebra = new Zebra(x1, y1);
+			ss >> yaw >> x1 >> y1;
+			zebra = new Zebra(x1, y1, yaw);
 			environment->addZebra(zebra);
 		}
 	}
@@ -206,25 +205,28 @@ void drawMap()
 	
 	//zebra
 	vector<Zebra *> zebras = environment->getZebras();
+	
 	for (Zebra *zebra : zebras)
 	{
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y + zebra->getInterval() * 1, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y + zebra->getInterval() * 2, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y + zebra->getInterval() * 3, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y + zebra->getInterval() * 4, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y + zebra->getInterval() * 5, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y + zebra->getInterval() * 6, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y + zebra->getInterval() * 7, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y + zebra->getInterval() * 8, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y - zebra->getInterval() * 1, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y - zebra->getInterval() * 2, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y - zebra->getInterval() * 3, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y - zebra->getInterval() * 4, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y - zebra->getInterval() * 5, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y - zebra->getInterval() * 6, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y - zebra->getInterval() * 7, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-		drawRectangle(zebra->getPosition().x, zebra->getPosition().y - zebra->getInterval() * 8, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
+		if (zebra->getYaw() == 0)
+		{
+			drawRectangle(zebra->getPosition().x, zebra->getPosition().y, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
+			for (int i=1; i<=zebra->getNum(); ++i)
+			{
+				drawRectangle(zebra->getPosition().x, zebra->getPosition().y + zebra->getInterval() * i, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
+				drawRectangle(zebra->getPosition().x, zebra->getPosition().y - zebra->getInterval() * i, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
+			}
+		}
+		else if (zebra->getYaw() == 1)
+		{
+			drawRectangle(zebra->getPosition().x, zebra->getPosition().y, zebra->getPosition().z, zebra->getWidth(), zebra->getLength(), zebra->getColor());
+			for (int i=1; i<=zebra->getNum(); ++i)
+			{
+				drawRectangle(zebra->getPosition().x - zebra->getInterval() * i, zebra->getPosition().y, zebra->getPosition().z, zebra->getWidth(), zebra->getLength(), zebra->getColor());
+				drawRectangle(zebra->getPosition().x + zebra->getInterval() * i, zebra->getPosition().y, zebra->getPosition().z, zebra->getWidth(), zebra->getLength(), zebra->getColor());
+			}
+		}
+		
 	}
 }
 
