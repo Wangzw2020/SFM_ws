@@ -118,7 +118,7 @@ Seperator::Seperator(float x1, float y1, float x2, float y2)
 Zebra::Zebra(float x, float y, int yaw)
 {
 	zebra_id_ = ++zebraIdx;
-	position_ = setPoint(x, y, 0.0);
+	position_ = setPoint(x, y, -0.02);
 	yaw_ = yaw;
 	color_.r = 150.0 / 255.0;
 	color_.g = 150.0 / 255.0;
@@ -140,16 +140,17 @@ Point Zebra::getLeftDown()
 	if (yaw_ == 0)
 	{
 		p.x = position_.x - length_/2;
-		p.y = position_.y - interval_ * num_ + width_ * num_ + width_/2;
+		p.y = position_.y - interval_ * num_ - width_ * num_ - width_/2;
 	}
 	else if (yaw_ == 1)
 	{
-		p.x = position_.x - interval_ * num_ + width_ * num_ + width_/2;
+		p.x = position_.x - interval_ * num_ - width_ * num_ - width_/2;
 		p.y = position_.y - length_/2;
 	}
-	p.z = 0.02;
+	p.z = -0.02;
 	return p;
 }
+
 Point Zebra::getRightUp()
 {
 	Point p;
@@ -163,7 +164,7 @@ Point Zebra::getRightUp()
 		p.x = position_.x + interval_ * num_ + width_ * num_ + width_/2;
 		p.y = position_.y + length_/2;
 	}
-	p.z = 0.02;
+	p.z = -0.02;
 	return p;
 }
 

@@ -6,7 +6,7 @@
 #include <vector>
 #include <fstream>
 #include "map.h"
-#include "environment.h"
+#include "traffic_lights.h"
 
 class Pedestrian{
 private:
@@ -16,11 +16,11 @@ private:
 	float react_time_, desiredSpeed_;
 	std::fstream data_;
 	Color color_;
-	Point position_, target_position_;
+	Point position_;
 	std::deque<Point> path_;
 	Eigen::Vector3d velocity_;
 	
-	Eigen::Vector3d drivingForce_();
+	Eigen::Vector3d drivingForce();
 	float A_ped_, B_ped_, lambda_, K, k;
 	Eigen::Vector3d pedInteractForce(std::vector<Pedestrian *> ped);
 	float A_wall_, B_wall_;
@@ -45,7 +45,7 @@ public:
 	void setColor(float r, float g, float b);
 	void setPosition(float x, float y);
 	void addPath(float x, float y);
-	void setGroup(int id);
+	void setGroupId(int id);
 	void setLightId(int id);
 	
 	int getId() { return ped_id_; }
@@ -59,7 +59,7 @@ public:
 	Eigen::Vector3d getVelocity() { return velocity_; }
 	float getOrientation();
 	
-	//void move(std::vector<Pedestrian *> ped, std::vector<Wall *> wall, std::vector<Zebra *> zebra, std::vector<Traffic_light *> light , float stepTime);
+	void move(std::vector<Pedestrian *> crowd, std::vector<Wall *> walls, std::vector<Zebra *> zebras, std::vector<Traffic_light *> lights , float stepTime);
 };
 
 int Pedestrian::crowdIdx = -1;
@@ -83,10 +83,9 @@ Pedestrian::Pedestrian()
 	}	
 	param_txt.close();
 	
-	radius_ = 0.2F;
-	react_time_ = 0.54F;
 	string file_name = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped" + std::to_string(ped_id_) +".txt";
 	data_.open(file_name);
+	//cout<<file_name<<endl;
 	if(!data_)
 		std::cout << "open data file failed!" << std::endl;
 
@@ -132,7 +131,7 @@ void Pedestrian::addPath(float x, float y)
 	path_.push_back(p);
 }
 
-void Pedestrian::setGroup(int id)
+void Pedestrian::setGroupId(int id)
 {
 	group_id_ = id;
 }
@@ -171,15 +170,21 @@ float Pedestrian::getOrientation()
 	return (atan2(velocity_[1], velocity_[0]) * (180 / PI));
 }
 
-//void Pedestrian::move(std::vector<Pedestrian *> ped, std::vector<Wall *> wall, std::vector<Zebra *> zebra, std::vector<Traffic_light *> light , float stepTime)
-//{
+void Pedestrian::move(std::vector<Pedestrian *> crowd, std::vector<Wall *> walls, std::vector<Zebra *> zebras, std::vector<Traffic_light *> lights , float stepTime)
+{
+	Eigen::Vector3d acceleration;
+	
+	acceleration = drivingForce() + pedInteractForce(crowd) + wallInteractForce(walls) + groupForce(crowd) +  zebraForce(zebras);
+	velocity_ = velocity_ + acceleration * stepTime;
+	
+	position_.x = position_.x + velocity_[0] * stepTime;
+	position_.y = position_.y + velocity_[1] * stepTime;
+}
 
-//}
-
-Eigen::Vector3d Pedestrian::drivingForce_()
+Eigen::Vector3d Pedestrian::drivingForce()
 {
 	Eigen::Vector3d e_i, f_i;
-	e_i = setVector(position_, target_position_);
+	e_i = setVector(position_, getPath());
 	e_i.normalize();
 	
 	f_i = ((desiredSpeed_ * e_i) - velocity_) * (1 / react_time_);
@@ -190,13 +195,12 @@ Eigen::Vector3d Pedestrian::pedInteractForce(std::vector<Pedestrian *> ped)
 {
 	Eigen::Vector3d dis_ij, n_ij, e_ij, F1, F2, F3, f_ij;
 	float F_ij;
-	
 	f_ij = Eigen::Vector3d::Zero();
-	F1 = Eigen::Vector3d::Zero();
 	
 	for (const Pedestrian *ped_j : ped)
 		if (ped_j->ped_id_ != ped_id_)
 		{
+			F1 = Eigen::Vector3d::Zero();
 			F2 = Eigen::Vector3d::Zero();
 			F3 = Eigen::Vector3d::Zero();
 			dis_ij = setVector(ped_j->position_, position_);
@@ -219,8 +223,7 @@ Eigen::Vector3d Pedestrian::pedInteractForce(std::vector<Pedestrian *> ped)
 				F2 = K * (radius_ + ped_j->radius_) * n_ij;
 				//F3
 			}
-			f_ij = F1 + F2 + F3;
-				
+			f_ij += F1 + F2 + F3;
 		}
 	return f_ij;
 }
@@ -280,7 +283,7 @@ bool Pedestrian::near_zebra(std::vector<Zebra *> zebras)
 {
 	for (Zebra *zebra_i: zebras)
 		if (position_.x >= zebra_i->getLeftDown().x - 0.5 && position_.x <= zebra_i->getRightUp().x + 0.5)
-			if (position_.y >= zebra_i->getLeftDown().y && position_.y <= zebra_i->getRightUp().y)
+			if (position_.y >= zebra_i->getLeftDown().y -0.5 && position_.y <= zebra_i->getRightUp().y + 0.5)
 			{
 				zebra_id_ = zebra_i->getId();
 				if (position_.x >= zebra_i->getLeftDown().x && position_.x <= zebra_i->getRightUp().x)
@@ -298,7 +301,6 @@ Eigen::Vector3d Pedestrian::zebraForce(std::vector<Zebra *> zebras)
 	Eigen::Vector3d f_z = Eigen::Vector3d::Zero();
 	if(!near_zebra(zebras))
 		return f_z;
-	
 	Eigen::Vector3d e_iz = Eigen::Vector3d::Zero();
 	float dis_to_z;
 	for (Zebra *zebra_i: zebras)
@@ -320,6 +322,8 @@ Eigen::Vector3d Pedestrian::zebraForce(std::vector<Zebra *> zebras)
 
 bool Pedestrian::see_light(std::vector<Traffic_light *> lights)
 {
+	return false;	
+	
 	return true;
 }
 

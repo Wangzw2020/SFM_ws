@@ -11,10 +11,12 @@ using namespace std;
 string map_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/map.txt";
 string ped_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped.txt";
 string vehicle_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/vehicle.txt";
+string light_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/lights.txt";
 
 GLsizei winWidth = 1600;
 GLsizei winHeight = 900;
 Environment *environment;
+Control *control;
 float fps = 0;
 bool act = false;
 
@@ -22,14 +24,16 @@ void init();
 void loadMap();
 void loadVehicle();
 void loadPed();
+void loadLight();
 
 void display();
 
 void drawMap();
 void drawCrowd();
-void drawCircle(float x, float y, float z, float r, int slices = 90);
-void drawRectangle(float x, float y, float z, float length, float width, Color color);
-void drawLights();
+void drawCircle(float x, float y, float z, float r, Color color, int slices = 90);
+void drawRectangle(float x, float y, float z, float length, float width, Color color, int fill);				//fill=0 不填充 fill=1 填充
+void drawVehicle();
+void drawLight();
 
 void showInformation();
 void drawText(float x, float y, char text[]);
@@ -86,10 +90,11 @@ void init()				//初始化opengl
 
 	//读取文件
 	environment = new Environment;
+	control = new Control;
 	loadMap();
 	loadPed();
 	loadVehicle();
-	
+	loadLight();
 }
 
 void loadMap()
@@ -109,7 +114,7 @@ void loadMap()
 		string type;
 		float x1, y1, x2, y2;
 		int yaw;
-		getline(map_file,line);
+		getline(map_file, line);
 		if (line.length() == 0)
 			break;
 			
@@ -134,17 +139,90 @@ void loadMap()
 			environment->addZebra(zebra);
 		}
 	}
+	cout<<"map loaded!"<<endl;
+	control->getEnvironment(environment);
 	map_file.close();
 }
 
 void loadPed()
 {
-
+	ifstream ped_file;
+	string line;
+	Pedestrian *ped;
+	
+	ped_file.open(ped_txt.c_str());
+	if(!ped_file)
+		cout<<"open ped file failed!"<<endl;
+	while(ped_file.good())
+	{
+		float x1, y1, x2, y2;
+		int g_id;
+		getline(ped_file, line);
+		if (line.length() == 0)
+			break;
+		ped = new Pedestrian;
+		std::stringstream ss(line);
+		ss >> g_id >> x1 >> y1 >> x2 >> y2;
+		ped->setGroupId(g_id);
+		ped->setPosition(randomFloat(x1-1.0, x1+1.0), randomFloat(y1-1.0, y1+1.0));
+		ped->addPath(randomFloat(x2-1.0, x2+1.0), randomFloat(y2-1.0, y2+1.0));
+		control->addPed(ped);
+	}
+	cout<<"ped loaded!"<<endl;
+	ped_file.close();
 }
 
 void loadVehicle()
 {
+	ifstream car_file;
+	string line;
+	Vehicle *car;
+	
+	car_file.open(vehicle_txt.c_str());
+	if(!car_file)
+		cout<<"open vehicle file failed!"<<endl;
+	while(car_file.good())
+	{
+		float x1, y1, x2, y2, speed;
+		getline(car_file, line);
+		if (line.length() == 0)
+			break;
+		car = new Vehicle;
+		std::stringstream ss(line);
+		ss >> x1 >> y1 >> x2 >> y2 >> speed;
+		car->setPosition(x1, y1, -0.01F);
+		car->setSpeed(speed);
+		car->addPath(x2, y2);
+		control->addCar(car);
+	}
+	cout<<"vehicle loaded!"<<endl;
+	car_file.close();
+}
 
+void loadLight()
+{
+	ifstream light_file;
+	string line;
+	Traffic_light *light;
+	
+	light_file.open(light_txt.c_str());
+	if(!light_file)
+		cout<<"open light file failed!"<<endl;
+	while(light_file.good())
+	{
+		float x1, y1, time, r;
+		int color;
+		getline(light_file, line);
+		if (line.length() == 0)
+			break;
+		
+		std::stringstream ss(line);
+		ss >> x1 >> y1 >> r >> color >> time;
+		light = new Traffic_light(x1, y1, r, color, time);
+		control->addLight(light);
+	}
+	cout<<"lights loaded!"<<endl;
+	light_file.close();
 }
 
 void display()
@@ -161,11 +239,9 @@ void display()
 	
 	//画图
 	drawMap();
-
-//	drawLights();
-
-//	drawCrowd();
-//	drawVehicle();
+	drawCrowd();
+	drawVehicle();
+	drawLight();
 
 	glPopMatrix();
 	showInformation();
@@ -210,37 +286,39 @@ void drawMap()
 	{
 		if (zebra->getYaw() == 0)
 		{
-			drawRectangle(zebra->getPosition().x, zebra->getPosition().y, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
+			drawRectangle(zebra->getPosition().x, zebra->getPosition().y, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor(), 1);
 			for (int i=1; i<=zebra->getNum(); ++i)
 			{
-				drawRectangle(zebra->getPosition().x, zebra->getPosition().y + zebra->getInterval() * i, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
-				drawRectangle(zebra->getPosition().x, zebra->getPosition().y - zebra->getInterval() * i, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor());
+				drawRectangle(zebra->getPosition().x, zebra->getPosition().y + zebra->getInterval() * 2 * i, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor(), 1);
+				drawRectangle(zebra->getPosition().x, zebra->getPosition().y - zebra->getInterval() * 2 * i, zebra->getPosition().z, zebra->getLength(), zebra->getWidth(), zebra->getColor(), 1);
 			}
 		}
 		else if (zebra->getYaw() == 1)
 		{
-			drawRectangle(zebra->getPosition().x, zebra->getPosition().y, zebra->getPosition().z, zebra->getWidth(), zebra->getLength(), zebra->getColor());
+			drawRectangle(zebra->getPosition().x, zebra->getPosition().y, zebra->getPosition().z, zebra->getWidth(), zebra->getLength(), zebra->getColor(), 1);
 			for (int i=1; i<=zebra->getNum(); ++i)
 			{
-				drawRectangle(zebra->getPosition().x - zebra->getInterval() * i, zebra->getPosition().y, zebra->getPosition().z, zebra->getWidth(), zebra->getLength(), zebra->getColor());
-				drawRectangle(zebra->getPosition().x + zebra->getInterval() * i, zebra->getPosition().y, zebra->getPosition().z, zebra->getWidth(), zebra->getLength(), zebra->getColor());
+				drawRectangle(zebra->getPosition().x - zebra->getInterval() * 2 * i, zebra->getPosition().y, zebra->getPosition().z, zebra->getWidth(), zebra->getLength(), zebra->getColor(), 1);
+				drawRectangle(zebra->getPosition().x + zebra->getInterval() * 2 * i, zebra->getPosition().y, zebra->getPosition().z, zebra->getWidth(), zebra->getLength(), zebra->getColor(), 1);
 			}
 		}
-		
 	}
 }
 
 void drawCrowd()
 {
-
+	vector<Pedestrian *> crowds = control->getCrowd();
+	for (Pedestrian *ped : crowds)
+		drawCircle(ped->getPosition().x, ped->getPosition().y, ped->getPosition().z, ped->getRadius(), ped->getColor());
 }
 
-void drawCircle(float x, float y, float z, float r, int slices)
+void drawCircle(float x, float y, float z, float r, Color color, int slices)
 {
 	float sliceAngle;
 	Point current, next;
 
-	glPushMatrix();		
+	glPushMatrix();	
+	glColor3f(color.r,color.g,color.b);	
 	glTranslatef(x, y, z);		 
 	sliceAngle = static_cast<float>(360.0 / slices);		
 	current.x = r;	
@@ -262,34 +340,43 @@ void drawCircle(float x, float y, float z, float r, int slices)
 	glPopMatrix();
 }
 
-void drawRectangle(float x, float y, float z, float length, float width, Color color)
+void drawRectangle(float x, float y, float z, float length, float width, Color color, int fill)
 {
 	glPushMatrix();
-	glTranslatef(x, y, 0.0);
-	//glBegin(GL_LINE_LOOP);
-	//	glVertex3f(x - length / 2, y - width / 2, 0.0);
-	//	glVertex3f(x + length / 2, y - width / 2, 0.0);
-	//	glVertex3f(x + length / 2, y + width / 2, 0.0);
-	//	glVertex3f(x - length / 2, y + width / 2, 0.0);
-	//glEnd();
 	glColor3f(color.r,color.g,color.b);
-	glBegin(GL_QUADS);
+	if (fill == 0)
+	{
+		glBegin(GL_LINE_LOOP);
+		glVertex3f(x - length / 2, y - width / 2, 0.0);
+		glVertex3f(x + length / 2, y - width / 2, 0.0);
+		glVertex3f(x + length / 2, y + width / 2, 0.0);
+		glVertex3f(x - length / 2, y + width / 2, 0.0);
+		glEnd();
+	}
+	else if (fill == 1)
+	{
+		glBegin(GL_QUADS);
 		glVertex3f(x - length / 2, y - width / 2, z);
 		glVertex3f(x + length / 2, y - width / 2, z);
 		glVertex3f(x + length / 2, y + width / 2, z);
 		glVertex3f(x - length / 2, y + width / 2, z);
-	glEnd();
+		glEnd();
+	}
 	glPopMatrix();
 }
 
-void drawLights()
+void drawVehicle()
 {
-
+	vector<Vehicle *> cars = control->getCars();
+	for (Vehicle *car : cars)
+		drawRectangle(car->getPosition().x, car->getPosition().y, car->getPosition().z , car->getLength(), car->getWidth(), car->getColor(), 0);
 }
 
-void drawZebra()
+void drawLight()
 {
-
+	vector<Traffic_light *> lights = control->getLights();
+	for (Traffic_light *light : lights)
+		drawCircle(light->getPosition().x, light->getPosition().y, light->getPosition().z, light->getRadius(), light->getColor());
 }
 
 void showInformation()
@@ -301,12 +388,12 @@ void showInformation()
 	
 	glColor3f(0.0, 0.0, 0.0);
 	drawText(margin.x, margin.y, "Total Ped:");
-//	_itoa_s(control->getCrowdSize(), totalCrowdsStr, 10);
-//	drawText(margin.x + 4.0F, margin.y, totalCrowdsStr);
+	totalCrowdsStr[0] = (char)('0' + control->getCrowdNum());
+	drawText(margin.x + 4.0F, margin.y, totalCrowdsStr);
 
-//	drawText(margin.x, margin.y - 0.9F, "Total Car:");
-//	_itoa_s(control->getNumCars(), totalCarsStr, 10);
-//	drawText(margin.x + 4.0F, margin.y - 0.9F, totalCarsStr);
+	drawText(margin.x, margin.y - 0.9F, "Total Car:");
+	totalCarsStr[0] = (char)('0' + control->getCarsNum());
+	drawText(margin.x + 4.0F, margin.y - 0.9F, totalCarsStr);
 
 //	drawText(margin.x, margin.y - 1.8F, "FPS:");
 //	_itoa_s(static_cast<int>(fps), fpsStr, 10);
@@ -356,8 +443,8 @@ void normalKey(unsigned char key, int xMousePos, int yMousePos) {
 		break;
 
 	case 27:
-//		delete control;
-// 		control = 0;
+		delete control;
+ 		control = 0;
 		exit(0);
 		break;
 	}
@@ -372,9 +459,9 @@ void update() {
 	prevTime = currTime;
 
 	if (act) {
-//		control->moveCrowd(static_cast<float>(frameTime) / 1800);
-//		control->moveCars(static_cast<float>(frameTime) / 1800);
-//		control->changeLights(static_cast<float>(frameTime) / 1800);
+		control->moveCrowd(static_cast<float>(frameTime) / 1800);
+		control->moveCars(static_cast<float>(frameTime) / 1800);
+		control->changeLights(static_cast<float>(frameTime) / 1800);
 	}
 
 	computeFPS();
