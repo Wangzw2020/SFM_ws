@@ -14,6 +14,8 @@ private:
 	int ped_id_, group_id_;
 	float radius_;
 	float react_time_, desiredSpeed_;
+	double pass_possiblity_, meet_time_;
+	bool initial_ = false;
 	std::fstream data_;
 	Color color_;
 	Point position_;
@@ -47,10 +49,15 @@ public:
 	void addPath(float x, float y);
 	void setGroupId(int id);
 	void setLightId(int id);
+	void setPossibility(double x);
+	void setMeetTime(double t);
 	
 	int getId() { return ped_id_; }
 	int getGroupId() { return group_id_; }
 	int getLightId() { return light_id_; }
+	double getPossibility() { return pass_possiblity_; }
+	double getMeetTime() { return meet_time_; }
+	bool isInitial() { return initial_; }
 	float getRadius() { return radius_; }
 	float getDesiredSpeed() { return desiredSpeed_; }
 	Color getColor() { return color_; }
@@ -91,6 +98,7 @@ Pedestrian::Pedestrian()
 
 	desiredSpeed_ = randomFloat(1.1F, 1.4F);
 	
+	pass_possiblity_ = 1.0;
 	color_ = fb_Color(0.0, 0.0, 0.0);
 	position_ = setPoint(0.0, 0.0, 0.0);
 	velocity_ = Eigen::Vector3d::Zero();;
@@ -141,6 +149,17 @@ void Pedestrian::setLightId(int id)
 	light_id_ = id;
 }
 
+void Pedestrian::setPossibility(double x)
+{
+	pass_possiblity_ = x;
+	initial_ = true;
+}
+
+void Pedestrian::setMeetTime(double t)
+{
+	meet_time_ = t;
+}
+
 Point Pedestrian::getPath()
 {
 	Eigen::Vector3d dis_now, dis_next;
@@ -186,8 +205,9 @@ Eigen::Vector3d Pedestrian::drivingForce()
 	Eigen::Vector3d e_i, f_i;
 	e_i = setVector(position_, getPath());
 	e_i.normalize();
+	double max_speed = desiredSpeed_ * pass_possiblity_;
 	
-	f_i = ((desiredSpeed_ * e_i) - velocity_) * (1 / react_time_);
+	f_i = ((max_speed * pass_possiblity_ * e_i) - velocity_) * (1 / react_time_);
 	return f_i;
 }
 

@@ -8,6 +8,7 @@
 
 using namespace std;
 
+string game_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/game.txt";
 string map_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/map.txt";
 string ped_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped.txt";
 string vehicle_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/vehicle.txt";
@@ -21,6 +22,7 @@ float fps = 0;
 bool act = false;
 
 void init();
+void loadGameMatrix();
 void loadMap();
 void loadVehicle();
 void loadPed();
@@ -91,10 +93,36 @@ void init()				//初始化opengl
 	//读取文件
 	environment = new Environment;
 	control = new Control;
+	loadGameMatrix();
 	loadMap();
 	loadPed();
 	loadVehicle();
 	loadLight();
+}
+
+void loadGameMatrix()
+{
+	ifstream game_file;
+	string line;
+	Evolution *evolution;
+	
+	game_file.open(game_txt.c_str());
+	if(!game_file)
+		cout<<"open game file failed!"<<endl;
+	while(game_file.good())
+	{
+		double J, N, A, B;
+		getline(game_file,line);
+		if (line.length() == 0)
+			break;
+		std::stringstream ss(line);
+		ss >> J >> N >> A >> B;
+		evolution = new Evolution;
+		evolution->setParam(J, N, A, B);
+		control->addEvolution(evolution);
+	}
+	game_file.close();
+	cout<<"game matrix loaded!"<<endl;
 }
 
 void loadMap()
@@ -230,7 +258,7 @@ void display()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
 
-	gluLookAt(0.0, 0.0, 40.0,		//相机位置
+	gluLookAt(0.0, 0.0, 35.0,		//相机位置
 			  0.0, 0.0, 0.0,		//相机镜头方向对准物体在世界坐标位置
 			  0.0, 1.0, 0.0);		//镜头向上方向在世界坐标的方向
 
@@ -459,9 +487,7 @@ void update() {
 	prevTime = currTime;
 
 	if (act) {
-		control->moveCrowd(static_cast<float>(frameTime) / 1800);
-		control->moveCars(static_cast<float>(frameTime) / 1800);
-		control->changeLights(static_cast<float>(frameTime) / 1800);
+		control->act(static_cast<float>(frameTime) / 1800);
 	}
 
 	computeFPS();

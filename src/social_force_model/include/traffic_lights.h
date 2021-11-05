@@ -88,7 +88,6 @@ void Traffic_light::change(float time)
 		setYellow();
 	
 	time_left_ = change_time_ - time_;
-	cout<<time_left_<<endl;
 }
 
 #endif
