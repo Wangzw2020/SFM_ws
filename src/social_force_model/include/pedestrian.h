@@ -42,10 +42,13 @@ public:
 	Pedestrian();
 	~Pedestrian();
 	
+	void recount();
+	
 	void setRadius(float r);
 	void setDesiredSpeed(float speed);
 	void setColor(float r, float g, float b);
 	void setPosition(float x, float y);
+	void setVelocity(float vx, float vy);
 	void addPath(float x, float y);
 	void setGroupId(int id);
 	void setLightId(int id);
@@ -90,11 +93,11 @@ Pedestrian::Pedestrian()
 	}	
 	param_txt.close();
 	
-	string file_name = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped" + std::to_string(ped_id_) +".txt";
-	data_.open(file_name);
-	//cout<<file_name<<endl;
-	if(!data_)
-		std::cout << "open data file failed!" << std::endl;
+//	string file_name = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped" + std::to_string(ped_id_) +".txt";
+//	data_.open(file_name);
+//	//cout<<file_name<<endl;
+//	if(!data_)
+//		std::cout << "open data file: " << file_name << " failed!" << std::endl;
 
 	desiredSpeed_ = randomFloat(1.1F, 1.4F);
 	
@@ -109,6 +112,11 @@ Pedestrian::~Pedestrian()
 	path_.clear();
 	crowdIdx--;
 	data_.close();
+}
+
+void Pedestrian::recount()
+{
+	crowdIdx = -1;
 }
 
 void Pedestrian::setRadius(float r)
@@ -129,6 +137,12 @@ void Pedestrian::setColor(float r, float g, float b)
 void Pedestrian::setPosition(float x, float y)
 {
 	position_ = setPoint(x, y, 0.0);
+}
+
+void Pedestrian::setVelocity(float vx, float vy)
+{
+	velocity_[0] = vx;
+	velocity_[1] = vy;
 }
 
 void Pedestrian::addPath(float x, float y)
@@ -238,11 +252,11 @@ Eigen::Vector3d Pedestrian::pedInteractForce(std::vector<Pedestrian *> ped)
 			else
 				F_ij = lambda_ + (1-lambda_)/2;
 			F1 = A_ped_ * exp((radius_ + ped_j->radius_ - dis_ij.norm()) / B_ped_) * n_ij * F_ij;
-			if (dis_ij.norm() < radius_ + ped_j->radius_)
-			{
-				F2 = K * (radius_ + ped_j->radius_) * n_ij;
-				//F3
-			}
+//			if (dis_ij.norm() < radius_ + ped_j->radius_)
+//			{
+//				F2 = K * (radius_ + ped_j->radius_) * n_ij;
+//				//F3
+//			}
 			f_ij += F1 + F2 + F3;
 		}
 	return f_ij;

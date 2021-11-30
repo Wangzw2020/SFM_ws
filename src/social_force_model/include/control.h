@@ -12,6 +12,8 @@ class Control{
 private:
 	float total_time_ = 0.0f;
 	
+	int target_id_;
+	
 	std::vector<Pedestrian *> crowd_;
 	std::vector<Vehicle *> cars_;
 	std::vector<Traffic_light *> lights_;
@@ -19,6 +21,7 @@ private:
 	Evolution *evolution_;
 	
 public:
+	Control();
 	~Control();
 	
 	void addPed(Pedestrian *ped);
@@ -26,14 +29,20 @@ public:
 	void addLight(Traffic_light *light);
 	void addEvolution(Evolution *evolution);
 	void getEnvironment(Environment *environment);
-	
+
 	std::vector<Pedestrian *> getCrowd() { return crowd_; }
 	int getCrowdNum() { return crowd_.size(); }
 	std::vector<Vehicle *> getCars() { return cars_; }
 	int getCarsNum() const { return cars_.size(); }
 	std::vector<Traffic_light *> getLights() { return lights_; }
 	int getLightsNum() { return lights_.size(); }
+	Evolution getEvolution() { return *evolution_; }
 	Environment *getEnvironment() { return environment_; }
+	
+	void setTargetId(int id);
+	int getTargetId() { return target_id_; }
+	void setTargetState(Eigen::VectorXd state);
+	VectorXd getTargetState();
 	
 	void removePed();
 	void removeCrowd();
@@ -49,11 +58,18 @@ public:
 	void act(float stepTime);
 };
 
+Control::Control()
+{
+	target_id_ = -1;
+	evolution_ = new Evolution;
+}
+
 Control::~Control()
 {
 	removeCrowd();
 	removeCars();
 	removeLights();
+	delete evolution_;
 }
 
 void Control::addPed(Pedestrian *ped)
@@ -79,6 +95,40 @@ void Control::addEvolution(Evolution *evolution)
 void Control::getEnvironment(Environment *environment)
 {
 	environment_ = environment;
+}
+
+void Control::setTargetId(int id)
+{
+	target_id_ = id;
+}
+
+void Control::setTargetState(Eigen::VectorXd state)
+{
+	
+	for (Pedestrian *ped_i: crowd_)
+	{
+		if (ped_i->getId() != target_id_)
+			continue;
+		ped_i->setPosition(state(0), state(1));
+		ped_i->setVelocity(state(2), state(3));
+	}
+}
+
+VectorXd Control::getTargetState()
+{
+	VectorXd target_state(4);
+	if (target_id_ == -1)
+		cout << "target id is not setted!" << endl;
+	for (Pedestrian *ped_i: crowd_)
+	{
+		if (ped_i->getId() != target_id_)
+			continue;
+		target_state(0) = ped_i->getPosition().x;
+		target_state(1) = ped_i->getPosition().y;
+		target_state(2) = ped_i->getVelocity()[0];
+		target_state(3) = ped_i->getVelocity()[1];
+	}
+	return target_state;
 }
 
 void Control::removeCrowd() 

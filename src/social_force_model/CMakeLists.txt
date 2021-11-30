@@ -47,5 +47,4 @@ add_executable(opengl_show src/opengl_show.cpp)
 target_link_libraries(opengl_show ${catkin_LIBRARIES})
 target_link_libraries(opengl_show ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} glfw)
 
-add_executable(ros_time_run src/ros_time_run.cpp)
 

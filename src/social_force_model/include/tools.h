@@ -31,6 +31,11 @@ float randomFloat(float lower, float upper)
 	return (lower + (static_cast<float>(rand()) / RAND_MAX) * (upper - lower));
 }
 
+double randomDouble(double lower, double upper)
+{
+	return (lower + (static_cast<double>(rand()) / RAND_MAX) * (upper - lower));
+}
+
 Eigen::Vector3d setVector(Point a, Point b)
 {
 	Eigen::Vector3d v(b.x-a.x, b.y-a.y, b.z-a.z);

@@ -5,6 +5,7 @@
 #include <string>
 #include "control.h"
 #include "map.h"
+#include "ukf.h"
 
 using namespace std;
 
@@ -13,13 +14,22 @@ string map_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ma
 string ped_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped.txt";
 string vehicle_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/vehicle.txt";
 string light_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/lights.txt";
+string tracking1_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/results/tracking1.txt";
+string tracking2_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/results/tracking2.txt";
+
+ofstream data1;
+ofstream data2;
 
 GLsizei winWidth = 1600;
 GLsizei winHeight = 900;
 Environment *environment;
 Control *control;
+Control *target1;
+Control *target2;
+
 float fps = 0;
 bool act = false;
+bool act_ukf = false;
 
 void init();
 void loadGameMatrix();
@@ -36,6 +46,9 @@ void drawCircle(float x, float y, float z, float r, Color color, int slices = 90
 void drawRectangle(float x, float y, float z, float length, float width, Color color, int fill);				//fill=0 不填充 fill=1 填充
 void drawVehicle();
 void drawLight();
+void drawTarget();
+
+Control *copyTargetInfo(Control *c, int id);	//将c中信息传递给t c为仿真 t为目标跟踪
 
 void showInformation();
 void drawText(float x, float y, char text[]);
@@ -93,11 +106,17 @@ void init()				//初始化opengl
 	//读取文件
 	environment = new Environment;
 	control = new Control;
+	target1 = new Control;
+	target2 = new Control;
+	
 	loadGameMatrix();
 	loadMap();
 	loadPed();
 	loadVehicle();
 	loadLight();
+	
+	data1.open(tracking1_txt);
+	data2.open(tracking2_txt);
 }
 
 void loadGameMatrix()
@@ -258,7 +277,7 @@ void display()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
 
-	gluLookAt(0.0, 0.0, 35.0,		//相机位置
+	gluLookAt(0.0, 0.0, 15.0,		//相机位置
 			  0.0, 0.0, 0.0,		//相机镜头方向对准物体在世界坐标位置
 			  0.0, 1.0, 0.0);		//镜头向上方向在世界坐标的方向
 
@@ -270,7 +289,9 @@ void display()
 	drawCrowd();
 	drawVehicle();
 	drawLight();
-
+	
+	drawTarget();
+	
 	glPopMatrix();
 	showInformation();
 	glutSwapBuffers();
@@ -407,6 +428,25 @@ void drawLight()
 		drawCircle(light->getPosition().x, light->getPosition().y, light->getPosition().z, light->getRadius(), light->getColor());
 }
 
+void drawTarget()
+{
+	vector<Pedestrian *> crowds = control->getCrowd();
+	Color c1, c2;
+	c1 = fb_Color(1.0, 0.0, 0.0);
+	c2 = fb_Color(0.0, 1.0, 0.0);
+	for (Pedestrian *ped : crowds)
+	{
+		if (ped->getId() == target1->getTargetId())
+		{
+			drawCircle(target1->getTargetState()(0), target1->getTargetState()(1), 0.01, 0.2, c1);
+		}
+		if (ped->getId() == target2->getTargetId())
+		{
+			drawCircle(target2->getTargetState()(0), target2->getTargetState()(1), 0.01, 0.2, c2);
+		}
+	}
+}
+
 void showInformation()
 {
 	Point margin;
@@ -469,9 +509,17 @@ void normalKey(unsigned char key, int xMousePos, int yMousePos) {
 	case 'a':
 		act = (!act) ? true : false;
 		break;
-
+	case 'b':
+		act_ukf = (!act_ukf) ? true : false;
+		break;
 	case 27:
 		delete control;
+		delete target1;
+		delete target2;
+		data1.close();
+		data2.close();
+		target1 = 0;
+		target2 = 0;
  		control = 0;
 		exit(0);
 		break;
@@ -481,18 +529,128 @@ void normalKey(unsigned char key, int xMousePos, int yMousePos) {
 void update() {
 	int currTime, frameTime;
 	static int prevTime;
-
+	static int actTime = 0;
+	
 	currTime = glutGet(GLUT_ELAPSED_TIME);
 	frameTime = currTime - prevTime;
 	prevTime = currTime;
-
+	
+		
 	if (act) {
-		control->act(static_cast<float>(frameTime) / 1800);
-	}
+		actTime+=frameTime;
+		
+		static UKF ukf_target1;
+		static UKF ukf_target2;
+		target1 = copyTargetInfo(control, 0);
+		target2 = copyTargetInfo(control, 1);
+		
+		ukf_target1.setControl(target1);
+		ukf_target2.setControl(target2);
+		ukf_target1.initialize(target1->getTargetState());
+		ukf_target2.initialize(target2->getTargetState());
+		
+		control->act(static_cast<float>(frameTime) / 1000);
+		
+		ukf_target1.predict(static_cast<float>(frameTime) / 1000);
+		control->setTargetId(0);
+		Eigen::VectorXd measurementState1(2);
+		measurementState1(0) = randomFloat(control->getTargetState()(0)-0.5,control->getTargetState()(0)+0.5);
+		measurementState1(1) = randomFloat(control->getTargetState()(1)-0.5,control->getTargetState()(1)+0.5);
+		Eigen::MatrixXd measurementMatrix(2,4);
+		measurementMatrix << 1, 0, 0, 0,
+							 0, 1, 0, 0;
+		Eigen::MatrixXd predictedSigmaPoints1 = ukf_target1.getPredictedSigmaPoints();
+		Eigen::MatrixXd MeasurementSigmaPoints1(2,9);
+		MeasurementSigmaPoints1.row(0) = predictedSigmaPoints1.row(0);
+		MeasurementSigmaPoints1.row(1) = predictedSigmaPoints1.row(1);
+		Eigen::MatrixXd measurementNoise(2,2);
+		measurementNoise.fill(0.1);
+		ukf_target1.update(measurementState1, measurementNoise, MeasurementSigmaPoints1, predictedSigmaPoints1, 2);		
 
+		data1 << actTime << " "	<< control->getTargetState()(0) << " " << control->getTargetState()(1) << " "
+								<< control->getTargetState()(2) << " " << control->getTargetState()(3) << " "
+								<< ukf_target1.getState()(0) << " " << ukf_target1.getState()(1) << " "
+								<< ukf_target1.getState()(2) << " " << ukf_target1.getState()(3) << " " << endl;
+								
+		ukf_target2.predict(static_cast<float>(frameTime) / 1000);
+		control->setTargetId(1);
+		Eigen::VectorXd measurementState2(2);
+		measurementState2(0) = randomFloat(control->getTargetState()(0)-0.5,control->getTargetState()(0)+0.5);
+		measurementState2(1) = randomFloat(control->getTargetState()(1)-0.5,control->getTargetState()(1)+0.5);
+		Eigen::MatrixXd predictedSigmaPoints2 = ukf_target2.getPredictedSigmaPoints();
+		Eigen::MatrixXd MeasurementSigmaPoints2(2,9);
+		MeasurementSigmaPoints2.row(0) = predictedSigmaPoints2.row(0);
+		MeasurementSigmaPoints2.row(1) = predictedSigmaPoints2.row(1);
+		ukf_target2.update(measurementState2, measurementNoise, MeasurementSigmaPoints2, predictedSigmaPoints2, 2);		
+
+		data2 << actTime << " "	<< control->getTargetState()(0) << " " << control->getTargetState()(1) << " "
+								<< control->getTargetState()(2) << " " << control->getTargetState()(3) << " "
+								<< ukf_target2.getState()(0) << " " << ukf_target2.getState()(1) << " "
+								<< ukf_target2.getState()(2) << " " << ukf_target2.getState()(3) << " " << endl;
+		
+		//act = false;
+	}
+		
 	computeFPS();
 	glutPostRedisplay();
 	glutIdleFunc(update);
+}
+
+Control *copyTargetInfo(Control *c, int id)
+{
+	Control *t;
+	t = new Control;
+	t->setTargetId(id);
+	t->getEnvironment(c->getEnvironment());
+
+	//load ped
+	Pedestrian *ped;
+	
+	ped->recount();
+	vector<Pedestrian *> crowds = control->getCrowd();
+	for (Pedestrian *ped_i : crowds)
+	{
+		ped = new Pedestrian;
+		ped->setGroupId(ped_i->getGroupId());
+		ped->setPosition(ped_i->getPosition().x ,ped_i->getPosition().y);
+		ped->setVelocity(ped_i->getVelocity()[0], ped_i->getVelocity()[1]);
+		ped->addPath(ped_i->getPath().x, ped_i->getPath().y);
+		ped->setPossibility(ped_i->getPossibility());
+		t->addPed(ped);
+	}
+
+	//load vehicle
+	Vehicle *car;
+	car->recount();
+	vector<Vehicle *> cars = control->getCars();
+	for (Vehicle *car_i : cars)
+	{
+		car = new Vehicle;
+		car->setPosition(car_i->getPosition().x, car_i->getPosition().y, 0.0);
+		car->setVelocity(car_i->getVelocity());
+		car->addPath(car_i->getPath().x, car_i->getPath().y);
+		car->setPossibility(car_i->getPossibility());
+		t->addCar(car);
+	}
+
+	//load light
+	Traffic_light *light;
+	light->recount();
+	vector<Traffic_light *> lights = control->getLights();
+	for (Traffic_light *light_i : lights)
+	{
+		light = new Traffic_light(light_i->getPosition().x, light_i->getPosition().y, light_i->getRadius(), light_i->getNowColor(), light_i->getChangeTime());
+		t->addLight(light);
+	}	
+
+	//load evolution
+	Evolution *e;
+	e = new Evolution;
+	*e = control->getEvolution();
+	
+	t->addEvolution(e);
+	
+	return t;
 }
 
 void computeFPS() {
@@ -505,7 +663,7 @@ void computeFPS() {
 	frameTime = currTime - prevTime;
 
 	if (frameTime > 1000) {
-		fps = frameCount / (static_cast<float>(frameTime) / 1800);
+		fps = frameCount / (static_cast<float>(frameTime) / 1000);
 		prevTime = currTime;
 		frameCount = 0;
 	}

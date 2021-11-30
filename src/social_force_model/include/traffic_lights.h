@@ -16,6 +16,7 @@ private:
 public:
 	Traffic_light();
 	Traffic_light(float x, float y, float r, int now, float time);
+	void recount();
 	
 	void setRed();
 	void setYellow();
@@ -24,7 +25,9 @@ public:
 	int getId() { return light_id_; }
 	Point getPosition() { return position_; }
 	float getRadius() { return radius_; }
+	int getNowColor() { return now_color_; }
 	Color getColor() { return color_; }
+	float getChangeTime() { return change_time_; }
 	float getTimeleft() { return time_left_; }
 	void change(float time);
 	
@@ -55,6 +58,11 @@ Traffic_light::Traffic_light(float x, float y, float r, int now, float time)
 	change_time_ = time;
 	time_ = 0.0F;
 	radius_ = r;
+}
+
+void Traffic_light::recount()
+{
+	lightIdx = -1;
 }
 
 void Traffic_light::setRed()

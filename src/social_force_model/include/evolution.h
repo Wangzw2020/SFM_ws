@@ -50,6 +50,7 @@ void Evolution::meet(std::vector<Pedestrian *> crowd, std::vector<Vehicle *> car
 	Point p;
 	Eigen::Vector3d dis_car, dis_ped, dis_between;
 	double t_car, t_ped;
+	
 	for (Vehicle *car_i: cars)
 	{
 		x1 = car_i->getPosition().x;
@@ -61,12 +62,12 @@ void Evolution::meet(std::vector<Pedestrian *> crowd, std::vector<Vehicle *> car
 			if(	dis_between.norm() >= 20.0 )
 			{
 				conflict_ = false;
-				break;
-			}		
+				continue;
+			}
 			x2= ped_i->getPosition().x;
 			y2 = ped_i->getPosition().y;
 			k2 = ped_i->getVelocity()[1] / ped_i->getVelocity()[0];
-
+			
 			p.x = (y2 - y1 + k1 * x1 - k2 * x2) / (k1 - k2);
 			p.y = (k1 * k2 * (x2 - x1) + k2 * y1 - k1 * y2) / (k2 - k1);
 			if (k1 * (p.x-x1) + y1 + 1.75 >= p.y && k1 * (p.x-x1) + y1 - 1.75 <= p.y)
@@ -95,7 +96,6 @@ void Evolution::meet(std::vector<Pedestrian *> crowd, std::vector<Vehicle *> car
 			}
 		}
 	}
-	
 }
 
 void Evolution::setParam(double J, double N, double A, double B)

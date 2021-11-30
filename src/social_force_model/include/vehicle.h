@@ -22,10 +22,13 @@ public:
 	Vehicle();
 	~Vehicle();
 	
+	void recount();
+	
 	void setSize(float l, float w);
 	void setPossibility(int i, double y);
 	void setPossibility(double y);
 	void setSpeed(float speed);
+	void setVelocity(Vector3d v);
 	void setPosition(float x, float y, float z);
 	void setColor(float r, float g, float b);
 	void addPath(float x, float y);
@@ -67,6 +70,11 @@ Vehicle::~Vehicle() {
 	vehicleIdx--;
 }
 
+void Vehicle::recount()
+{
+	vehicleIdx = -1;
+}
+
 void Vehicle::setSize(float l, float w)
 {
 	length_ = l;
@@ -88,6 +96,11 @@ void Vehicle::setSpeed(float speed)
 {
 	max_speed_ = speed;
 	velocity_[0] = max_speed_;
+}
+
+void Vehicle::setVelocity(Vector3d v)
+{
+	velocity_ = v;
 }
 
 void Vehicle::setPosition(float x, float y, float z)
