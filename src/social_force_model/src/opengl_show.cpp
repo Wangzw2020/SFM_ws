@@ -546,16 +546,28 @@ void update() {
 		
 		ukf_target1.setControl(target1);
 		ukf_target2.setControl(target2);
-		ukf_target1.initialize(target1->getTargetState());
-		ukf_target2.initialize(target2->getTargetState());
+		Eigen::VectorXd targetstate1, targetstate2;
+		targetstate1 = target1->getTargetState();
+		targetstate1(0) += gaussian_noise(0.0, 0.1);
+		targetstate1(1) += gaussian_noise(0.0, 0.1);
+		targetstate1(2) = 0;
+		targetstate1(3) = 0;
+		ukf_target1.initialize(targetstate1);
+		targetstate2 = target2->getTargetState();
+		targetstate2(0) += gaussian_noise(0.0, 0.1);
+		targetstate2(1) += gaussian_noise(0.0, 0.1);
+		targetstate2(2) = 0;
+		targetstate2(3) = 0;
+		ukf_target2.initialize(targetstate2);
 		
 		control->act(static_cast<float>(frameTime) / 1000);
 		
 		ukf_target1.predict(static_cast<float>(frameTime) / 1000);
 		control->setTargetId(0);
 		Eigen::VectorXd measurementState1(2);
-		measurementState1(0) = randomFloat(control->getTargetState()(0)-0.5,control->getTargetState()(0)+0.5);
-		measurementState1(1) = randomFloat(control->getTargetState()(1)-0.5,control->getTargetState()(1)+0.5);
+		measurementState1(0) = control->getTargetState()(0) + gaussian_noise(0.0, 0.1);
+		measurementState1(1) = control->getTargetState()(1) + gaussian_noise(0.0, 0.1);
+		cout<<"true:"<<control->getTargetState()(0)<<'\t'<<control->getTargetState()(1)<<endl;
 		Eigen::MatrixXd measurementMatrix(2,4);
 		measurementMatrix << 1, 0, 0, 0,
 							 0, 1, 0, 0;
@@ -575,8 +587,9 @@ void update() {
 		ukf_target2.predict(static_cast<float>(frameTime) / 1000);
 		control->setTargetId(1);
 		Eigen::VectorXd measurementState2(2);
-		measurementState2(0) = randomFloat(control->getTargetState()(0)-0.5,control->getTargetState()(0)+0.5);
-		measurementState2(1) = randomFloat(control->getTargetState()(1)-0.5,control->getTargetState()(1)+0.5);
+		measurementState2(0) = control->getTargetState()(0) + gaussian_noise(0.0, 0.1);
+		measurementState2(1) = control->getTargetState()(1) + gaussian_noise(0.0, 0.1);
+		cout<<"true:"<<control->getTargetState()(0)<<'\t'<<control->getTargetState()(1)<<endl;
 		Eigen::MatrixXd predictedSigmaPoints2 = ukf_target2.getPredictedSigmaPoints();
 		Eigen::MatrixXd MeasurementSigmaPoints2(2,9);
 		MeasurementSigmaPoints2.row(0) = predictedSigmaPoints2.row(0);

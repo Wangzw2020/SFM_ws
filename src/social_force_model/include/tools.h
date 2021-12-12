@@ -42,6 +42,13 @@ Eigen::Vector3d setVector(Point a, Point b)
 	return v;
 }
 
+double gaussian_noise(double mean, double stddev)
+{
+	std::default_random_engine generator;
+	std::normal_distribution<double> dist(mean, stddev);
+	return dist(generator);
+}
+
 Point setPoint(float x, float y, float z)
 {
 	Point p;
