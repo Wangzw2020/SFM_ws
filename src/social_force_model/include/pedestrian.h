@@ -93,11 +93,11 @@ Pedestrian::Pedestrian()
 	}	
 	param_txt.close();
 	
-//	string file_name = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped" + std::to_string(ped_id_) +".txt";
-//	data_.open(file_name);
-//	//cout<<file_name<<endl;
-//	if(!data_)
-//		std::cout << "open data file: " << file_name << " failed!" << std::endl;
+	string file_name = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped" + std::to_string(ped_id_) +".txt";
+	data_.open(file_name);
+	//cout<<file_name<<endl;
+	if(!data_)
+		std::cout << "open data file: " << file_name << " failed!" << std::endl;
 
 	desiredSpeed_ = randomFloat(1.1F, 1.4F);
 	
@@ -206,12 +206,14 @@ float Pedestrian::getOrientation()
 void Pedestrian::move(std::vector<Pedestrian *> crowd, std::vector<Wall *> walls, std::vector<Zebra *> zebras, std::vector<Traffic_light *> lights , float stepTime)
 {
 	Eigen::Vector3d acceleration;
-	
+	static double t = 0;
 	acceleration = drivingForce() + pedInteractForce(crowd) + wallInteractForce(walls) + groupForce(crowd) +  zebraForce(zebras);
 	velocity_ = velocity_ + acceleration * stepTime;
 	
 	position_.x = position_.x + velocity_[0] * stepTime;
 	position_.y = position_.y + velocity_[1] * stepTime;
+	t += stepTime;
+	data_ << t << " " << position_.x << " " << position_.y << endl;
 }
 
 Eigen::Vector3d Pedestrian::drivingForce()

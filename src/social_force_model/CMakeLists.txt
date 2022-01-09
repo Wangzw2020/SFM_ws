@@ -47,4 +47,11 @@ add_executable(opengl_show src/opengl_show.cpp)
 target_link_libraries(opengl_show ${catkin_LIBRARIES})
 target_link_libraries(opengl_show ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} glfw)
 
+add_executable(data_show src/data_show.cpp)
+target_link_libraries(data_show ${catkin_LIBRARIES})
+target_link_libraries(data_show ${OPENGL_LIBRARIES} ${GLUT_LIBRARY} glfw)
+
+
+
+
 

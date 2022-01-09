@@ -2,6 +2,7 @@
 #define VEHICLE_H
 #include <vector>
 #include <deque>
+#include <fstream>
 
 using namespace std;
 using namespace Eigen;
@@ -13,6 +14,7 @@ private:
 	float length_, width_, max_speed_;
 	std::vector<double> pass_possiblity_;
 	bool initial_ = false;
+	std::fstream data_;
 	Color color_;
 	Point position_, target_position_;
 	std::deque<Point> path_;
@@ -63,6 +65,12 @@ Vehicle::Vehicle() {
 	double p = DBL_MAX;
 	for (int i=0; i<100; ++i)
 		pass_possiblity_.push_back(p);
+
+	string file_name = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/car_data/car" + std::to_string(car_id_) +".txt";
+	data_.open(file_name);
+	if(!data_)
+		std::cout << "open data file: " << file_name << " failed!" << std::endl;
+
 }
 
 Vehicle::~Vehicle() {
@@ -158,6 +166,8 @@ void Vehicle::move(float stepTime)
 	acceleration[1] = 0.0F;
 	acceleration[2] = 0.0F;
 	
+	static double t = 0;
+
 	double desiredSpeed = getPossibility() * max_speed_;
 	
 	if (velocity_.norm() < desiredSpeed)
@@ -170,6 +180,8 @@ void Vehicle::move(float stepTime)
 	
 	position_.x += velocity_[0] * stepTime;	
 	position_.y += velocity_[1] * stepTime;
+	t += stepTime;
+	data_ << t << " " << position_.x << " " << position_.y << endl; 
 }
 
 

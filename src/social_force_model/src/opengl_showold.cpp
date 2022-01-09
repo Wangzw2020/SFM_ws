@@ -534,10 +534,73 @@ void update() {
 	currTime = glutGet(GLUT_ELAPSED_TIME);
 	frameTime = currTime - prevTime;
 	prevTime = currTime;
+	
 		
 	if (act) {
 		actTime+=frameTime;
+		
+		static UKF ukf_target1;
+		static UKF ukf_target2;
+		target1 = copyTargetInfo(control, 0);
+		target2 = copyTargetInfo(control, 1);
+		
+		ukf_target1.setControl(target1);
+		ukf_target2.setControl(target2);
+		Eigen::VectorXd targetstate1, targetstate2;
+		targetstate1 = target1->getTargetState();
+		targetstate1(0) += gaussian_noise(0.0, 0.1);
+		targetstate1(1) += gaussian_noise(0.0, 0.1);
+		targetstate1(2) = 0;
+		targetstate1(3) = 0;
+		ukf_target1.initialize(targetstate1);
+		targetstate2 = target2->getTargetState();
+		targetstate2(0) += gaussian_noise(0.0, 0.1);
+		targetstate2(1) += gaussian_noise(0.0, 0.1);
+		targetstate2(2) = 0;
+		targetstate2(3) = 0;
+		ukf_target2.initialize(targetstate2);
+		
 		control->act(static_cast<float>(frameTime) / 1000);
+		
+		ukf_target1.predict(static_cast<float>(frameTime) / 1000);
+		control->setTargetId(0);
+		Eigen::VectorXd measurementState1(2);
+		measurementState1(0) = control->getTargetState()(0) + gaussian_noise(0.0, 0.1);
+		measurementState1(1) = control->getTargetState()(1) + gaussian_noise(0.0, 0.1);
+		cout<<"true:"<<control->getTargetState()(0)<<'\t'<<control->getTargetState()(1)<<endl;
+		Eigen::MatrixXd measurementMatrix(2,4);
+		measurementMatrix << 1, 0, 0, 0,
+							 0, 1, 0, 0;
+		Eigen::MatrixXd predictedSigmaPoints1 = ukf_target1.getPredictedSigmaPoints();
+		Eigen::MatrixXd MeasurementSigmaPoints1(2,9);
+		MeasurementSigmaPoints1.row(0) = predictedSigmaPoints1.row(0);
+		MeasurementSigmaPoints1.row(1) = predictedSigmaPoints1.row(1);
+		Eigen::MatrixXd measurementNoise(2,2);
+		measurementNoise.fill(0.1);
+		ukf_target1.update(measurementState1, measurementNoise, MeasurementSigmaPoints1, predictedSigmaPoints1, 2);		
+
+		data1 << actTime << " "	<< control->getTargetState()(0) << " " << control->getTargetState()(1) << " "
+								<< control->getTargetState()(2) << " " << control->getTargetState()(3) << " "
+								<< ukf_target1.getState()(0) << " " << ukf_target1.getState()(1) << " "
+								<< ukf_target1.getState()(2) << " " << ukf_target1.getState()(3) << " " << endl;
+								
+		ukf_target2.predict(static_cast<float>(frameTime) / 1000);
+		control->setTargetId(1);
+		Eigen::VectorXd measurementState2(2);
+		measurementState2(0) = control->getTargetState()(0) + gaussian_noise(0.0, 0.1);
+		measurementState2(1) = control->getTargetState()(1) + gaussian_noise(0.0, 0.1);
+		cout<<"true:"<<control->getTargetState()(0)<<'\t'<<control->getTargetState()(1)<<endl;
+		Eigen::MatrixXd predictedSigmaPoints2 = ukf_target2.getPredictedSigmaPoints();
+		Eigen::MatrixXd MeasurementSigmaPoints2(2,9);
+		MeasurementSigmaPoints2.row(0) = predictedSigmaPoints2.row(0);
+		MeasurementSigmaPoints2.row(1) = predictedSigmaPoints2.row(1);
+		ukf_target2.update(measurementState2, measurementNoise, MeasurementSigmaPoints2, predictedSigmaPoints2, 2);		
+
+		data2 << actTime << " "	<< control->getTargetState()(0) << " " << control->getTargetState()(1) << " "
+								<< control->getTargetState()(2) << " " << control->getTargetState()(3) << " "
+								<< ukf_target2.getState()(0) << " " << ukf_target2.getState()(1) << " "
+								<< ukf_target2.getState()(2) << " " << ukf_target2.getState()(3) << " " << endl;
+		
 		//act = false;
 	}
 		

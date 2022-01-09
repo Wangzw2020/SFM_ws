@@ -5,6 +5,7 @@
 #include <cmath>
 #include <Eigen/Eigen>
 #include <Eigen/Dense>
+#include <random>
 using namespace std;
 
 const float PI = 3.14159265359F;

@@ -9,47 +9,26 @@
 using namespace std;
 using namespace Eigen;
 
-Pedestrian *ped;
-
-struct StateInfo{
-	int id;
-	double p_x;
-	double p_y;
-	double v_x;
-	double v_y;
-};
-
 class UKF{
 private:
-	static int targetIdx;
 	bool initialized_;
 	int stateDimension_;
 	int sigmaPointsNum_;
 	double alpha_, beta_, lambda_;
 	int kappa_;
 	
-	std::vector<StateInfo> all_targets_;
-
 	VectorXd state_;
 	MatrixXd stateCovariance_;
 	MatrixXd predictedSigmaPoints_;
 	VectorXd stateWeights_;
 	VectorXd stateCovarianceWeights_;
 	
-	int measurementDimension_;
-	VectorXd measurementState_;
-	MatrixXd measurementNoise_;
-	MatrixXd measurementSigmaPoints_;
-	MatrixXd measurementMatrix_;
-	
 	bool initialize(VectorXd initialState, MatrixXd initialStateCovariance);
-	void updateNum();
-	void setMeasurement(VectorXd measurement, MatrixXd measurementNoise, int dimention);
 	MatrixXd computeSigmaPoints(VectorXd initialState, MatrixXd initialStateCovariance);
 	MatrixXd sigmaPointPrediction(MatrixXd &sigmaPoints, const double &deltaTime);
 	
 	VectorXd calculateState(VectorXd &state, MatrixXd &predictedSigmaPoints);
-	MatrixXd calculateCovariance(MatrixXd &stateCovariance, MatrixXd &predictedSigmaPoints, VectorXd &predictedState, MatrixXd &processNoise);
+	MatrixXd predictCovariance(MatrixXd &stateCovariance, MatrixXd &predictedSigmaPoints, VectorXd &predictedState, MatrixXd &processNoise);
 	MatrixXd calculateProcessNoise(const double &deltaTime, const double &yaw);
 	
 	VectorXd setStateWeights();
@@ -60,16 +39,19 @@ private:
 public:
 	UKF();
 	~UKF();
-
+	
+	void setControl(Control *c);
 	Control *getControl() { return control_; }
-
+	
 	bool isInitialized() { return initialized_; }
-	bool initialize(VectorXd firstState, Control *c);
+	bool initialize(VectorXd firstState);
 	VectorXd getState() { return state_; }
 	MatrixXd getStateCovariance() { return stateCovariance_; }
 	MatrixXd getPredictedSigmaPoints() { return predictedSigmaPoints_; }
 	MatrixXd predict(const double deltaTime);
-	void update();
+	void update(VectorXd &measurements, MatrixXd &measurementNoise,
+                MatrixXd &measurementSigmaPoints, MatrixXd predictedSigmaPoints,
+                const int measurementDimension);
 	bool isVectorValid(const VectorXd testVector);
 	bool doesVectorContainValues(const VectorXd testVector);
 	bool isMatrixValid(const MatrixXd testMatrix);
@@ -77,16 +59,13 @@ public:
 	
 };
 
-int UKF::targetIdx = -1;
-
 UKF::UKF()
 {
 	alpha_ = 0.1;		//0 < alpha <= 1
 	beta_ = 2;			//for Gaussian distributions b = 2 is optimal
-	stateDimension_ = 4 * all_targets_.size();
+	stateDimension_ = 4;
 	kappa_ = 0.0;		//k is a secondary scaling parameter
 	sigmaPointsNum_ = 2 * stateDimension_ + 1;
-	measurementDimension_ = 2;
 	//lambda是缩放因子，控制sigma点与均值的分离距离
 	lambda_ = alpha_ * alpha_ * (stateDimension_ + kappa_) - stateDimension_;
 	
@@ -98,6 +77,7 @@ UKF::UKF()
 	stateCovariance_.fill(0.0);
 	predictedSigmaPoints_.resize(stateDimension_, sigmaPointsNum_);
 	predictedSigmaPoints_.fill(0.0);
+	
 }
 
 UKF::~UKF()
@@ -105,87 +85,28 @@ UKF::~UKF()
 
 }
 
-/*void UKF::setControl(Control *c)*/
-/*{*/
-/*	control_ = c;*/
-/*}*/
+void UKF::setControl(Control *c)
+{
+	control_ = c;
+}
 
-bool UKF::initialize(VectorXd firstState, Control *c)
+bool UKF::initialize(VectorXd firstState)
 {
 	if (initialized_ == true)
 		return initialized_;
 	
 	if (!isVectorValid(firstState))
 		return false;
-	
-	ped = new Pedestrian;
-	
-	control_ = c;
-	
-	int num = firstState.size();
-	num = num/4;
-	for (int i=0; i<num; ++i)
-	{
-		++targetIdx;
-		StateInfo state_i;
-		state_i.id = targetIdx;
-		state_i.p_x = firstState(0+4*i);
-		state_i.p_y = firstState(1+4*i);
-		state_i.v_x = firstState(2+4*i);
-		state_i.v_y = firstState(3+4*i);
-		all_targets_.push_back(state_i);
-		ped->setGroupId(1);
-		ped->setPosition(firstState(0+4*i), firstState(1+4*i));
-		ped->addPath(firstState(0+4*i), firstState(1+4*i) + 50);
-		control_->addPed(ped);
-	}
-	
-	updateNum();
-	
-	initialized_ = true;
-	cout << "ukf initialized!" << endl;
-	cout << "firstState: \n" << state_ << endl;
-	return initialized_;
-}
-
-void UKF::updateNum()
-{
-	int num = all_targets_.size();
-	stateDimension_ = 4 * num;
-	sigmaPointsNum_ = 2 * stateDimension_ + 1;
-
-	lambda_ = alpha_ * alpha_ * (stateDimension_ + kappa_) - stateDimension_;
-	
-	state_.resize(stateDimension_);
-	measurementMatrix_.resize(measurementDimension_, stateDimension_);
-	measurementMatrix_.fill(0);
-	for (int i=0; i<num; ++i)
-	{
-		state_(0+4*i) = all_targets_[i].p_x;
-		state_(1+4*i) = all_targets_[i].p_y;
-		state_(2+4*i) = all_targets_[i].v_x;
-		state_(3+4*i) = all_targets_[i].v_y;
-		measurementMatrix_(0, 0+4*i) = 1;
-		measurementMatrix_(1, 1+4*i) = 1;
-	}
-	
-	cout << "measurement matrix: \n" << measurementMatrix_ << endl;
-	
+		
 	stateWeights_ = setStateWeights();
 	stateCovarianceWeights_ = setCovarianceWeights();
 	
-	stateCovariance_.resize(stateDimension_, stateDimension_);
+	state_ = firstState;
 	stateCovariance_ = 100 * Eigen::MatrixXd::Identity(stateDimension_, stateDimension_);
-	predictedSigmaPoints_.resize(stateDimension_, sigmaPointsNum_);
-	predictedSigmaPoints_.fill(0.0);
-}
-
-void UKF::setMeasurement(VectorXd measurement, MatrixXd measurementNoise, int dimention)
-{
-	measurementState_ = measurement;
-	measurementNoise_ = measurementNoise;
-	measurementDimension_ = dimention;
-	measurementSigmaPoints_ = measurementMatrix_ * predictedSigmaPoints_;
+	
+	initialized_ = true;
+	return initialized_;
+	
 }
 
 VectorXd UKF::setStateWeights()
@@ -221,26 +142,25 @@ VectorXd UKF::setCovarianceWeights()
 
 MatrixXd UKF::predict(const double deltaTime)
 {
-	cout << "predict!" << endl;
 	if (!isInitialized())
 		cout << "UKF is not initialized!" << endl;
 		
 	if (deltaTime < 0)
-		cout << "deltaTime < 0!" << endl;
-
+		cout << "deltaTime < 0 !" << endl;
+	
 	MatrixXd sigmaPoints = computeSigmaPoints(state_, stateCovariance_);
-	cout << "sigmaPoints: \n" << sigmaPoints <<endl;
+	//cout << "sigmaPoints: \n" << sigmaPoints <<endl;
 	
 	predictedSigmaPoints_ = sigmaPointPrediction(sigmaPoints, deltaTime);
 	cout << "predictedSigmaPoints: \n" << predictedSigmaPoints_ <<endl;
-
+	
 	VectorXd predictedState = calculateState(state_, predictedSigmaPoints_);
 	cout << "predictedState: \n" << predictedState.transpose() <<endl;
-
+	
 	MatrixXd processNoise = calculateProcessNoise(deltaTime, predictedState(2));
 	//cout << "processNoise: \n" << processNoise <<endl;
-
-	MatrixXd predictedStateCovariance = calculateCovariance(stateCovariance_, predictedSigmaPoints_, predictedState, processNoise);
+	
+	MatrixXd predictedStateCovariance = predictCovariance(stateCovariance_, predictedSigmaPoints_, predictedState, processNoise);
 	//cout << "predictedStateCovariance: \n" << predictedStateCovariance <<endl;
 
 	if (!(isVectorValid(predictedState) || isMatrixValid(predictedStateCovariance)))
@@ -249,12 +169,13 @@ MatrixXd UKF::predict(const double deltaTime)
 	}
 	state_ = predictedState;
 	stateCovariance_ = predictedStateCovariance;
-
+	
 	return predictedSigmaPoints_;
 }
 
 MatrixXd UKF::computeSigmaPoints(VectorXd initialState, MatrixXd initialStateCovariance)
 {
+	
 	MatrixXd sigmaPoints(stateDimension_, sigmaPointsNum_);
 	MatrixXd squareRootMatrix = initialStateCovariance.llt().matrixL();
 	
@@ -281,20 +202,16 @@ MatrixXd UKF::sigmaPointPrediction(MatrixXd &sigmaPoints, const double &deltaTim
 		const double p_y = sigmaPoints(1,i);
 		const double v_x = sigmaPoints(2,i);
 		const double v_y = sigmaPoints(3,i);
-		for (Pedestrian *ped : crowds)
-		{
-			ped->setPosition(p_x, p_y);
-			ped->setVelocity(v_x, v_y);
-		}
 		control_->act(deltaTime);
 		
 		for (Pedestrian *ped : crowds)
-		{
-			predictedSigmaPoints(0, i) = ped->getPosition().x;
-			predictedSigmaPoints(1, i) = ped->getPosition().y;
-			predictedSigmaPoints(2, i) = ped->getVelocity()[0];
-			predictedSigmaPoints(3, i) = ped->getVelocity()[1];
-		}
+			if (ped->getId() == control_->getTargetId())
+			{
+				predictedSigmaPoints(0, i) = ped->getPosition().x;
+				predictedSigmaPoints(1, i) = ped->getPosition().y;
+				predictedSigmaPoints(2, i) = ped->getVelocity()[0];
+				predictedSigmaPoints(3, i) = ped->getVelocity()[1];
+			}
 	}
 	
 	return predictedSigmaPoints;
@@ -308,53 +225,53 @@ MatrixXd UKF::calculateProcessNoise(const double &deltaTime, const double &yaw)
 	return A;
 }
 
-void UKF::update()
+void UKF::update(VectorXd &measurements, MatrixXd &measurementNoise,
+				MatrixXd &measurementSigmaPoints, MatrixXd predictedSigmaPoints,
+				const int measurementDimension)
 {
 	if (!isInitialized())
 		cout << "UKF is not initialized!" << endl;
 	
-	if (!isVectorValid(measurementState_))
+	if (!isVectorValid(measurements))
 		cout << "The measurement vector is not valid!" << endl;
 		
-	if (!doesVectorContainValues(measurementState_))
+	if (!doesVectorContainValues(measurements))
 		cout << "The measurement vector is empty!" << endl;
 		
-	if (!isMatrixValid(measurementNoise_))
+	if (!isMatrixValid(measurementNoise))
 		cout << "The measurementNoise matrix is not valid!" << endl;
 	
-	if (!isMatrixValid(measurementSigmaPoints_))
+	if (!isMatrixValid(measurementSigmaPoints))
 		cout << "The measurementSigmaPoints matrix is not valid!" << endl;
 		
-	if (!isMatrixValid(predictedSigmaPoints_))
+	if (!isMatrixValid(predictedSigmaPoints))
 		cout << "The predictedSigmaPoints matrix is not valid!" << endl;
 		
-	if (measurementDimension_ <= 0)
-		cout << "The measurementDimension is not permitted!" << endl;
-	else if (measurementDimension_ > stateDimension_)
-		cout << "New target Found!" << endl;
+	if (measurementDimension <= 0 || measurementDimension > stateDimension_)
+		cout << "The measurementDimension is not permitted!";
 	
-	VectorXd predictedMeasurements(measurementDimension_);
+	VectorXd predictedMeasurements(measurementDimension);
 	predictedMeasurements.fill(0.0);
-	MatrixXd measurementCovariance(measurementDimension_, measurementDimension_);
+	MatrixXd measurementCovariance(measurementDimension, measurementDimension);
 	measurementCovariance.fill(0.0);
-	MatrixXd crossCorrelation(stateDimension_, measurementDimension_);
+	MatrixXd crossCorrelation(stateDimension_, measurementDimension);
     crossCorrelation.fill(0.0);
 
-	predictedMeasurements = calculateState(predictedMeasurements, measurementSigmaPoints_);
+	predictedMeasurements = calculateState(predictedMeasurements, measurementSigmaPoints);
 	//cout << "predictedMeasurements: \n" << predictedMeasurements <<endl;
 
-	measurementCovariance = calculateCovariance(measurementCovariance, measurementSigmaPoints_, predictedMeasurements, measurementNoise_);
+	measurementCovariance = predictCovariance (measurementCovariance, measurementSigmaPoints, predictedMeasurements, measurementNoise);
 	//cout << "measurementCovariance: \n" << measurementCovariance <<endl;
 	
-	VectorXd measurementDifference(sigmaPointsNum_);
+	VectorXd measurementDifference;
 	measurementDifference.fill(0.0);
-	VectorXd stateDifference(sigmaPointsNum_);
+	VectorXd stateDifference;
 	stateDifference.fill(0.0);
 	
 	for(int i = 0; i<sigmaPointsNum_; ++i)
 	{
-		measurementDifference = measurementSigmaPoints_.col(i) - predictedMeasurements;
-		stateDifference = predictedSigmaPoints_.col(i) - state_;
+		measurementDifference = measurementSigmaPoints.col(i) - predictedMeasurements;
+		stateDifference = predictedSigmaPoints.col(i) - state_;
 		crossCorrelation += stateCovarianceWeights_(i) * stateDifference * measurementDifference.transpose();
 	}
 	//cout << "crossCorrelation: \n" << crossCorrelation <<endl;
@@ -365,8 +282,8 @@ void UKF::update()
 	MatrixXd KalmanGain = crossCorrelation * measurementCovariance.inverse();
 	//cout << "KalmanGain: \n" << KalmanGain <<endl;
 	
-	cout << "measurement state: \n" << measurementState_.transpose() <<endl;
-	measurementDifference = measurementState_ - predictedMeasurements;
+	cout << "measurement state: \n" << measurements.transpose() <<endl;
+	measurementDifference = measurements - predictedMeasurements;
 	
 	VectorXd temp_state = state_;
 	temp_state += KalmanGain * measurementDifference;
@@ -380,17 +297,9 @@ void UKF::update()
 	
 	state_ = temp_state;
 	stateCovariance_ = temp_stateCovaiance;
-	
-	for (int i=0; i< all_targets_.size(); ++i)
-	{
-		all_targets_[i].p_x = state_(0+4*i);
-		all_targets_[i].p_y = state_(1+4*i);
-		all_targets_[i].v_x = state_(2+4*i);
-		all_targets_[i].v_y = state_(3+4*i);
-	}
 }
 
-MatrixXd UKF::calculateCovariance(MatrixXd &stateCovariance, MatrixXd &predictedSigmaPoints, VectorXd &predictedState, MatrixXd &processNoise)
+MatrixXd UKF::predictCovariance(MatrixXd &stateCovariance, MatrixXd &predictedSigmaPoints, VectorXd &predictedState, MatrixXd &processNoise)
 {
 	MatrixXd predictedStateCovariance(stateCovariance.rows(), stateCovariance.cols());
 	predictedStateCovariance.fill(0.0);

@@ -3,40 +3,39 @@
 #include <GL/glut.h>
 #include <vector>
 #include <string>
-#include "control.h"
 #include "map.h"
+#include "data.h"
 #include "ukf.h"
 
 using namespace std;
 
+string ped0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped0.txt";
+string car0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/car_data/car0.txt";
+
 string game_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/game.txt";
 string map_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/map.txt";
-string ped_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped.txt";
-string vehicle_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/vehicle.txt";
 string light_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/lights.txt";
-string tracking1_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/results/tracking1.txt";
-string tracking2_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/results/tracking2.txt";
-
-ofstream data1;
-ofstream data2;
 
 GLsizei winWidth = 1600;
 GLsizei winHeight = 900;
 Environment *environment;
 Control *control;
-Control *target1;
-Control *target2;
+UKF *ukf;
+
+int flag = 0;
+int data_num = 0;
+std::vector<double> data_time;
+std::vector<Data *> All_measurement_data;
 
 float fps = 0;
 bool act = false;
-bool act_ukf = false;
 
 void init();
 void loadGameMatrix();
+void loadData();
 void loadMap();
-void loadVehicle();
-void loadPed();
 void loadLight();
+void loadVehicle();
 
 void display();
 
@@ -48,16 +47,12 @@ void drawVehicle();
 void drawLight();
 void drawTarget();
 
-Control *copyTargetInfo(Control *c, int id);	//将c中信息传递给t c为仿真 t为目标跟踪
-
 void showInformation();
 void drawText(float x, float y, char text[]);
 void reshape(int width, int height);
 void normalKey(unsigned char key, int xMousePos, int yMousePos);
 void update();
 void computeFPS();
-
-
 
 int main(int argc, char **argv)
 {
@@ -90,12 +85,12 @@ void init()				//初始化opengl
 	glLightfv(GL_LIGHT0, GL_POSITION, lghtPosition);
 
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_NORMALIZE);	
+	glEnable(GL_NORMALIZE);
 	glEnable(GL_LIGHTING);
 	glEnable(GL_COLOR_MATERIAL);
 	glEnable(GL_LIGHT0);
 	glCullFace(GL_BACK);
-	glEnable(GL_CULL_FACE);	
+	glEnable(GL_CULL_FACE);
 
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	glEnable(GL_BLEND);
@@ -106,17 +101,13 @@ void init()				//初始化opengl
 	//读取文件
 	environment = new Environment;
 	control = new Control;
-	target1 = new Control;
-	target2 = new Control;
+	ukf = new UKF;
 	
 	loadGameMatrix();
+	loadData();
 	loadMap();
-	loadPed();
-	loadVehicle();
 	loadLight();
-	
-	data1.open(tracking1_txt);
-	data2.open(tracking2_txt);
+	loadVehicle();
 }
 
 void loadGameMatrix()
@@ -144,6 +135,63 @@ void loadGameMatrix()
 	cout<<"game matrix loaded!"<<endl;
 }
 
+void loadData()
+{
+	ifstream data_file;
+	string line;
+
+	Data *data;
+	
+	data_file.open(ped0_txt.c_str());
+	data = new Data;
+	if(!data_file)
+		cout<<"open ped0 file failed!"<<endl;
+	while(data_file.good())
+	{
+		double t,x,y;
+		Info info;
+		data->setType(0);
+		getline(data_file, line);
+		if (line.length() == 0)
+			break;
+		std::stringstream ss(line);
+
+		ss >> t >> x >> y;
+		info.time = t;
+		info.x = x;
+		info.y = y;
+		data->addData(info);
+		data_time.push_back(t);
+	}
+	All_measurement_data.push_back(data);
+	data_file.close();
+	
+	data_file.open(car0_txt.c_str());
+	data = new Data;
+	if(!data_file)
+		cout << "open ped0 file failed!" << endl;
+	while(data_file.good())
+	{
+		double t,x,y;
+		Info info;
+		data->setType(1);
+		getline(data_file, line);
+		if (line.length() == 0)
+			break;
+		std::stringstream ss(line);
+
+		ss >> t >> x >> y;
+		info.time = t;
+		info.x = x;
+		info.y = y;
+		data->addData(info);
+		data_num++;
+	}
+	All_measurement_data.push_back(data);
+	data_file.close();
+	cout << "all data loaded!" << endl;
+}
+
 void loadMap()
 {
 	ifstream map_file;
@@ -164,9 +212,10 @@ void loadMap()
 		getline(map_file, line);
 		if (line.length() == 0)
 			break;
-			
+
 		std::stringstream ss(line);
 		ss>>type;
+		
 		if (type == "wall")
 		{
 			ss >> x1 >> y1 >> x2 >> y2;
@@ -186,90 +235,28 @@ void loadMap()
 			environment->addZebra(zebra);
 		}
 	}
-	cout<<"map loaded!"<<endl;
 	control->getEnvironment(environment);
+	cout<<"map loaded!"<<endl;
 	map_file.close();
-}
-
-void loadPed()
-{
-	ifstream ped_file;
-	string line;
-	Pedestrian *ped;
-	
-	ped_file.open(ped_txt.c_str());
-	if(!ped_file)
-		cout<<"open ped file failed!"<<endl;
-	while(ped_file.good())
-	{
-		float x1, y1, x2, y2;
-		int g_id;
-		getline(ped_file, line);
-		if (line.length() == 0)
-			break;
-		ped = new Pedestrian;
-		std::stringstream ss(line);
-		ss >> g_id >> x1 >> y1 >> x2 >> y2;
-		ped->setGroupId(g_id);
-		ped->setPosition(randomFloat(x1-1.0, x1+1.0), randomFloat(y1-1.0, y1+1.0));
-		ped->addPath(randomFloat(x2-1.0, x2+1.0), randomFloat(y2-1.0, y2+1.0));
-		control->addPed(ped);
-	}
-	cout<<"ped loaded!"<<endl;
-	ped_file.close();
-}
-
-void loadVehicle()
-{
-	ifstream car_file;
-	string line;
-	Vehicle *car;
-	
-	car_file.open(vehicle_txt.c_str());
-	if(!car_file)
-		cout<<"open vehicle file failed!"<<endl;
-	while(car_file.good())
-	{
-		float x1, y1, x2, y2, speed;
-		getline(car_file, line);
-		if (line.length() == 0)
-			break;
-		car = new Vehicle;
-		std::stringstream ss(line);
-		ss >> x1 >> y1 >> x2 >> y2 >> speed;
-		car->setPosition(x1, y1, -0.01F);
-		car->setSpeed(speed);
-		car->addPath(x2, y2);
-		control->addCar(car);
-	}
-	cout<<"vehicle loaded!"<<endl;
-	car_file.close();
 }
 
 void loadLight()
 {
-	ifstream light_file;
-	string line;
-	Traffic_light *light;
-	
-	light_file.open(light_txt.c_str());
-	if(!light_file)
-		cout<<"open light file failed!"<<endl;
-	while(light_file.good())
-	{
-		float x1, y1, time, r;
-		int color;
-		getline(light_file, line);
-		if (line.length() == 0)
-			break;
-		
-		std::stringstream ss(line);
-		ss >> x1 >> y1 >> r >> color >> time;
-		light = new Traffic_light(x1, y1, r, color, time);
-		control->addLight(light);
-	}
-	cout<<"lights loaded!"<<endl;
-	light_file.close();
+
+}
+
+void loadVehicle()
+{
+	Vehicle *car;
+	for (Data *data : All_measurement_data)
+		if (data->getType() == 1)
+		{
+			car = new Vehicle;
+			car->setPosition(data->getData(0).x, data->getData(0).y, -0.01F);
+			car->setSpeed(15.0);
+			car->addPath(data->getData(data_num-1).x, data->getData(data_num-1).y);
+			control->addCar(car);
+		}
 }
 
 void display()
@@ -277,7 +264,7 @@ void display()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
 
-	gluLookAt(0.0, 0.0, 15.0,		//相机位置
+	gluLookAt(0.0, 0.0, 30.0,		//相机位置
 			  0.0, 0.0, 0.0,		//相机镜头方向对准物体在世界坐标位置
 			  0.0, 1.0, 0.0);		//镜头向上方向在世界坐标的方向
 
@@ -356,9 +343,13 @@ void drawMap()
 
 void drawCrowd()
 {
-	vector<Pedestrian *> crowds = control->getCrowd();
-	for (Pedestrian *ped : crowds)
-		drawCircle(ped->getPosition().x, ped->getPosition().y, ped->getPosition().z, ped->getRadius(), ped->getColor());
+	Color ped_color = fb_Color(0.0, 0.0, 0.0);
+	for (Data *data : All_measurement_data)
+		if (data->getType() == 0)
+		{
+			Info ped_i = data->getData(flag);
+			drawCircle(ped_i.x, ped_i.y, 0.0, 0.3, ped_color);
+		}
 }
 
 void drawCircle(float x, float y, float z, float r, Color color, int slices)
@@ -416,34 +407,30 @@ void drawRectangle(float x, float y, float z, float length, float width, Color c
 
 void drawVehicle()
 {
-	vector<Vehicle *> cars = control->getCars();
-	for (Vehicle *car : cars)
-		drawRectangle(car->getPosition().x, car->getPosition().y, car->getPosition().z , car->getLength(), car->getWidth(), car->getColor(), 0);
+	Color car_color = fb_Color(0.0, 0.0, 0.0);
+	for (Data *data : All_measurement_data)
+		if (data->getType() == 1)
+		{
+			Info car_i = data->getData(flag);
+			drawRectangle(car_i.x, car_i.y, 0.01, 3.2F, 2.2F, car_color, 0);
+		}
 }
 
 void drawLight()
 {
-	vector<Traffic_light *> lights = control->getLights();
-	for (Traffic_light *light : lights)
-		drawCircle(light->getPosition().x, light->getPosition().y, light->getPosition().z, light->getRadius(), light->getColor());
+
 }
 
 void drawTarget()
 {
-	vector<Pedestrian *> crowds = control->getCrowd();
-	Color c1, c2;
+	if (ukf->isInitialized() == false)
+		return;
+	vector<Pedestrian *> crowds = ukf->getControl()->getCrowd();
+	Color c1;
 	c1 = fb_Color(1.0, 0.0, 0.0);
-	c2 = fb_Color(0.0, 1.0, 0.0);
 	for (Pedestrian *ped : crowds)
 	{
-		if (ped->getId() == target1->getTargetId())
-		{
-			drawCircle(target1->getTargetState()(0), target1->getTargetState()(1), 0.01, 0.2, c1);
-		}
-		if (ped->getId() == target2->getTargetId())
-		{
-			drawCircle(target2->getTargetState()(0), target2->getTargetState()(1), 0.01, 0.2, c2);
-		}
+		drawCircle(ped->getPosition().x, ped->getPosition().y, 0.01, 0.2, c1);
 	}
 }
 
@@ -454,14 +441,14 @@ void showInformation()
 	margin.x = static_cast<float>(-winWidth) / 50;
 	margin.y = static_cast<float>(winHeight) / 50 - 0.75F;
 	
-	glColor3f(0.0, 0.0, 0.0);
-	drawText(margin.x, margin.y, "Total Ped:");
-	totalCrowdsStr[0] = (char)('0' + control->getCrowdNum());
-	drawText(margin.x + 4.0F, margin.y, totalCrowdsStr);
+//	glColor3f(0.0, 0.0, 0.0);
+//	drawText(margin.x, margin.y, "Total Ped:");
+//	totalCrowdsStr[0] = (char)('0' + control->getCrowdNum());
+//	drawText(margin.x + 4.0F, margin.y, totalCrowdsStr);
 
-	drawText(margin.x, margin.y - 0.9F, "Total Car:");
-	totalCarsStr[0] = (char)('0' + control->getCarsNum());
-	drawText(margin.x + 4.0F, margin.y - 0.9F, totalCarsStr);
+//	drawText(margin.x, margin.y - 0.9F, "Total Car:");
+//	totalCarsStr[0] = (char)('0' + control->getCarsNum());
+//	drawText(margin.x + 4.0F, margin.y - 0.9F, totalCarsStr);
 
 //	drawText(margin.x, margin.y - 1.8F, "FPS:");
 //	_itoa_s(static_cast<int>(fps), fpsStr, 10);
@@ -510,17 +497,8 @@ void normalKey(unsigned char key, int xMousePos, int yMousePos) {
 		act = (!act) ? true : false;
 		break;
 	case 'b':
-		act_ukf = (!act_ukf) ? true : false;
 		break;
 	case 27:
-		delete control;
-		delete target1;
-		delete target2;
-		data1.close();
-		data2.close();
-		target1 = 0;
-		target2 = 0;
- 		control = 0;
 		exit(0);
 		break;
 	}
@@ -534,73 +512,52 @@ void update() {
 	currTime = glutGet(GLUT_ELAPSED_TIME);
 	frameTime = currTime - prevTime;
 	prevTime = currTime;
-		
-	if (act) {
+	
+	if (act) { 
 		actTime+=frameTime;
-		control->act(static_cast<float>(frameTime) / 1000);
+		int i;
+		for (i=0; i<data_time.size(); ++i)
+		{
+//			if(actTime <= i * 100)
+//				break;
+			if(actTime <= i * 33)
+				break;
+			if(i == data_time.size() - 1)
+			{
+				actTime = 0;
+				break;
+			}
+		}
+		flag = i;
+		if (flag >= data_num)
+		flag = 0;
+		
+		VectorXd state((All_measurement_data.size()-1) * 4);
+		state.fill(0.0);
+		
+		VectorXd measurement((All_measurement_data.size()-1) * 2);
+		measurement.fill(0.0);
+		
+		for (int i=0; i<All_measurement_data.size(); ++i)
+		{
+			if(All_measurement_data[i]->getType() == 0)
+			{
+				state(0+4*i) = All_measurement_data[i]->getData(flag).x + gaussian_noise(0.0, 0.1);
+				state(1+4*i) = All_measurement_data[i]->getData(flag).y + gaussian_noise(0.0, 0.1);
+				measurement(0+2*i) = All_measurement_data[i]->getData(flag).x + gaussian_noise(0.0, 0.1);
+				measurement(1+2*i) = All_measurement_data[i]->getData(flag).y + gaussian_noise(0.0, 0.1);
+			}
+		}
+		
+		ukf->initialize(state, control);
+		ukf->predict(static_cast<float>(frameTime) / 1000);
+		
 		//act = false;
 	}
 		
 	computeFPS();
 	glutPostRedisplay();
 	glutIdleFunc(update);
-}
-
-Control *copyTargetInfo(Control *c, int id)
-{
-	Control *t;
-	t = new Control;
-	t->setTargetId(id);
-	t->getEnvironment(c->getEnvironment());
-
-	//load ped
-	Pedestrian *ped;
-	
-	ped->recount();
-	vector<Pedestrian *> crowds = control->getCrowd();
-	for (Pedestrian *ped_i : crowds)
-	{
-		ped = new Pedestrian;
-		ped->setGroupId(ped_i->getGroupId());
-		ped->setPosition(ped_i->getPosition().x ,ped_i->getPosition().y);
-		ped->setVelocity(ped_i->getVelocity()[0], ped_i->getVelocity()[1]);
-		ped->addPath(ped_i->getPath().x, ped_i->getPath().y);
-		ped->setPossibility(ped_i->getPossibility());
-		t->addPed(ped);
-	}
-
-	//load vehicle
-	Vehicle *car;
-	car->recount();
-	vector<Vehicle *> cars = control->getCars();
-	for (Vehicle *car_i : cars)
-	{
-		car = new Vehicle;
-		car->setPosition(car_i->getPosition().x, car_i->getPosition().y, 0.0);
-		car->setVelocity(car_i->getVelocity());
-		car->addPath(car_i->getPath().x, car_i->getPath().y);
-		car->setPossibility(car_i->getPossibility());
-		t->addCar(car);
-	}
-
-	//load light
-	Traffic_light *light;
-	light->recount();
-	vector<Traffic_light *> lights = control->getLights();
-	for (Traffic_light *light_i : lights)
-	{
-		light = new Traffic_light(light_i->getPosition().x, light_i->getPosition().y, light_i->getRadius(), light_i->getNowColor(), light_i->getChangeTime());
-		t->addLight(light);
-	}	
-
-	//load evolution
-	Evolution *e;
-	e = new Evolution;
-	*e = control->getEvolution();
-	
-	t->addEvolution(e);
-	
-	return t;
 }
 
 void computeFPS() {
