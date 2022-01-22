@@ -277,7 +277,7 @@ void display()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
 
-	gluLookAt(0.0, 0.0, 15.0,		//相机位置
+	gluLookAt(0.0, 0.0, 20.0,		//相机位置
 			  0.0, 0.0, 0.0,		//相机镜头方向对准物体在世界坐标位置
 			  0.0, 1.0, 0.0);		//镜头向上方向在世界坐标的方向
 

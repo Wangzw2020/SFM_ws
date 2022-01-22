@@ -25,7 +25,7 @@ UKF *ukf;
 int flag = 0;
 int data_num = 0;
 std::vector<double> data_time;
-std::vector<Data *> All_measurement_data;
+std::vector<Data> All_measurement_data;
 
 float fps = 0;
 bool act = false;
@@ -140,17 +140,15 @@ void loadData()
 	ifstream data_file;
 	string line;
 
-	Data *data;
-	
+	Data data1;
 	data_file.open(ped0_txt.c_str());
-	data = new Data;
 	if(!data_file)
 		cout<<"open ped0 file failed!"<<endl;
 	while(data_file.good())
 	{
 		double t,x,y;
 		Info info;
-		data->setType(0);
+		data1.setType(0);
 		getline(data_file, line);
 		if (line.length() == 0)
 			break;
@@ -160,21 +158,21 @@ void loadData()
 		info.time = t;
 		info.x = x;
 		info.y = y;
-		data->addData(info);
+		data1.addData(info);
 		data_time.push_back(t);
 	}
-	All_measurement_data.push_back(data);
+	All_measurement_data.push_back(data1);
 	data_file.close();
 	
 	data_file.open(car0_txt.c_str());
-	data = new Data;
+	Data data2;
 	if(!data_file)
 		cout << "open ped0 file failed!" << endl;
 	while(data_file.good())
 	{
 		double t,x,y;
 		Info info;
-		data->setType(1);
+		data2.setType(1);
 		getline(data_file, line);
 		if (line.length() == 0)
 			break;
@@ -184,10 +182,10 @@ void loadData()
 		info.time = t;
 		info.x = x;
 		info.y = y;
-		data->addData(info);
+		data2.addData(info);
 		data_num++;
 	}
-	All_measurement_data.push_back(data);
+	All_measurement_data.push_back(data2);
 	data_file.close();
 	cout << "all data loaded!" << endl;
 }
@@ -248,13 +246,14 @@ void loadLight()
 void loadVehicle()
 {
 	Vehicle *car;
-	for (Data *data : All_measurement_data)
-		if (data->getType() == 1)
+	for (int i=0; i<All_measurement_data.size(); ++i)
+		if (All_measurement_data[i].getType() == 1)
 		{
 			car = new Vehicle;
-			car->setPosition(data->getData(0).x, data->getData(0).y, -0.01F);
+			car->setPosition(All_measurement_data[i].getData(0).x, All_measurement_data[i].getData(0).y, -0.01F);
 			car->setSpeed(15.0);
-			car->addPath(data->getData(data_num-1).x, data->getData(data_num-1).y);
+			car->addPath(All_measurement_data[i].getData(data_num-1).x, All_measurement_data[i].getData(data_num-1).y);
+			car->setUKF();
 			control->addCar(car);
 		}
 }
@@ -264,7 +263,7 @@ void display()
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
 
-	gluLookAt(0.0, 0.0, 30.0,		//相机位置
+	gluLookAt(0.0, 0.0, 20.0,		//相机位置
 			  0.0, 0.0, 0.0,		//相机镜头方向对准物体在世界坐标位置
 			  0.0, 1.0, 0.0);		//镜头向上方向在世界坐标的方向
 
@@ -344,10 +343,10 @@ void drawMap()
 void drawCrowd()
 {
 	Color ped_color = fb_Color(0.0, 0.0, 0.0);
-	for (Data *data : All_measurement_data)
-		if (data->getType() == 0)
+	for (int i=0; i<All_measurement_data.size(); ++i)
+		if (All_measurement_data[i].getType() == 0)
 		{
-			Info ped_i = data->getData(flag);
+			Info ped_i = All_measurement_data[i].getData(flag);
 			drawCircle(ped_i.x, ped_i.y, 0.0, 0.3, ped_color);
 		}
 }
@@ -357,17 +356,17 @@ void drawCircle(float x, float y, float z, float r, Color color, int slices)
 	float sliceAngle;
 	Point current, next;
 
-	glPushMatrix();	
-	glColor3f(color.r,color.g,color.b);	
-	glTranslatef(x, y, z);		 
-	sliceAngle = static_cast<float>(360.0 / slices);		
-	current.x = r;	
+	glPushMatrix();
+	glColor3f(color.r,color.g,color.b);
+	glTranslatef(x, y, z); 
+	sliceAngle = static_cast<float>(360.0 / slices);
+	current.x = r;
 	current.y = 0;
 	current.z = 0.0f;
 	next.z = 0.0f;
 	for (float angle = sliceAngle; angle <= 360; angle += sliceAngle) {
 		next.x = r * cos(angle * PI / 180);
-		next.y = r * sin(angle * PI / 180);  
+		next.y = r * sin(angle * PI / 180);
 
 		glBegin(GL_TRIANGLES);
 			glVertex3f(0.0, 0.0, 0.0);
@@ -408,10 +407,10 @@ void drawRectangle(float x, float y, float z, float length, float width, Color c
 void drawVehicle()
 {
 	Color car_color = fb_Color(0.0, 0.0, 0.0);
-	for (Data *data : All_measurement_data)
-		if (data->getType() == 1)
+	for (int i=0; i<All_measurement_data.size(); ++i)
+		if (All_measurement_data[i].getType() == 1)
 		{
-			Info car_i = data->getData(flag);
+			Info car_i = All_measurement_data[i].getData(flag);
 			drawRectangle(car_i.x, car_i.y, 0.01, 3.2F, 2.2F, car_color, 0);
 		}
 }
@@ -425,12 +424,13 @@ void drawTarget()
 {
 	if (ukf->isInitialized() == false)
 		return;
-	vector<Pedestrian *> crowds = ukf->getControl()->getCrowd();
+	VectorXd state = ukf->getState();
+	static int num = state.size()/4;
 	Color c1;
 	c1 = fb_Color(1.0, 0.0, 0.0);
-	for (Pedestrian *ped : crowds)
+	for (int i = 0; i<num; ++i)
 	{
-		drawCircle(ped->getPosition().x, ped->getPosition().y, 0.01, 0.2, c1);
+		drawCircle(state(0+4*i), state(1+4*i), 0.01, 0.2, c1);
 	}
 }
 
@@ -508,6 +508,9 @@ void update() {
 	int currTime, frameTime;
 	static int prevTime;
 	static int actTime = 0;
+	static int i = 0;
+	static bool tracking;
+	tracking = false;
 	
 	currTime = glutGet(GLUT_ELAPSED_TIME);
 	frameTime = currTime - prevTime;
@@ -515,42 +518,111 @@ void update() {
 	
 	if (act) { 
 		actTime+=frameTime;
-		int i;
-		for (i=0; i<data_time.size(); ++i)
+//		cout << actTime << endl;
+//		if(actTime >= i * 100)
+		if(actTime >= i * 33)
 		{
-//			if(actTime <= i * 100)
-//				break;
-			if(actTime <= i * 33)
-				break;
-			if(i == data_time.size() - 1)
+			for(int k=0; k<data_time.size(); ++k)
 			{
+				if(actTime <= data_time[k] * 1000)
+				{
+					flag = k;
+					break;
+				}
+			}
+			
+			static int statedimention = (All_measurement_data.size()-1) * 4;
+			VectorXd state(statedimention);
+			state.fill(0.0);
+			
+			static int measurementdimention = (All_measurement_data.size()-1) * 2;
+			VectorXd measurement(measurementdimention);
+			measurement.fill(0.0);
+			
+			MatrixXd measurementnoise(measurementdimention, measurementdimention);
+			for (int i=0; i<measurementdimention; ++i)
+			{
+				measurementnoise(i,i) = 10;
+			}
+			
+			for (int i=0; i<All_measurement_data.size(); ++i)
+			{
+				if(All_measurement_data[i].getType() == 0)
+				{
+					state(0+4*i) = All_measurement_data[i].getData(flag).x + gaussian_noise(0.0, 0.1);
+					state(1+4*i) = All_measurement_data[i].getData(flag).y + gaussian_noise(0.0, 0.1);
+					measurement(0+2*i) = All_measurement_data[i].getData(flag).x + gaussian_noise(0.0, 0.1);
+					measurement(1+2*i) = All_measurement_data[i].getData(flag).y + gaussian_noise(0.0, 0.1);
+				}
+			}
+			if(i == 0)
+			{
+				ukf->initialize(state, control);
+			}
+			else
+			{
+				//ukf->predict(0.100);
+				ukf->predict(0.033);
+				ukf->setMeasurement(measurement, measurementnoise, measurement.size());
+				ukf->update();
+			}
+			
+			++i;
+			cout << "step: " << i << endl;
+			if (actTime/1000 >= data_time[data_time.size()-1])
+			{
+				flag = 0;
+				i = 0;
 				actTime = 0;
-				break;
 			}
 		}
-		flag = i;
-		if (flag >= data_num)
-		flag = 0;
+
+//		for (i=0; i<data_time.size(); ++i)
+//		{
+////			if(actTime <= i * 100)
+////				break;
+//			if(actTime <= i * 33)
+//			{
+//				tracking = true;
+//				break;
+//			}
+//			if(i == data_time.size() - 1)
+//			{
+//				actTime = 0;
+//				break;
+//			}
+//		}
+//		flag = i;
+//		if (flag >= data_num)
+//		flag = 0;
+//		
+//		VectorXd state((All_measurement_data.size()-1) * 4);
+//		state.fill(0.0);
+//		
+//		VectorXd measurement((All_measurement_data.size()-1) * 2);
+//		measurement.fill(0.0);
+//		
+//		for (int i=0; i<All_measurement_data.size(); ++i)
+//		{
+//			if(All_measurement_data[i].getType() == 0)
+//			{
+//				state(0+4*i) = All_measurement_data[i].getData(flag).x + gaussian_noise(0.0, 0.1);
+//				state(1+4*i) = All_measurement_data[i].getData(flag).y + gaussian_noise(0.0, 0.1);
+//				measurement(0+2*i) = All_measurement_data[i].getData(flag).x + gaussian_noise(0.0, 0.1);
+//				measurement(1+2*i) = All_measurement_data[i].getData(flag).y + gaussian_noise(0.0, 0.1);
+//			}
+//		}
+//		
+////		if (tracking == true)
+////		{
+////			
+////			
+////			tracking = false;
+////		}
+//		ukf->initialize(state, control);
+//		ukf->predict(static_cast<float>(frameTime) / 1000);
 		
-		VectorXd state((All_measurement_data.size()-1) * 4);
-		state.fill(0.0);
 		
-		VectorXd measurement((All_measurement_data.size()-1) * 2);
-		measurement.fill(0.0);
-		
-		for (int i=0; i<All_measurement_data.size(); ++i)
-		{
-			if(All_measurement_data[i]->getType() == 0)
-			{
-				state(0+4*i) = All_measurement_data[i]->getData(flag).x + gaussian_noise(0.0, 0.1);
-				state(1+4*i) = All_measurement_data[i]->getData(flag).y + gaussian_noise(0.0, 0.1);
-				measurement(0+2*i) = All_measurement_data[i]->getData(flag).x + gaussian_noise(0.0, 0.1);
-				measurement(1+2*i) = All_measurement_data[i]->getData(flag).y + gaussian_noise(0.0, 0.1);
-			}
-		}
-		
-		ukf->initialize(state, control);
-		ukf->predict(static_cast<float>(frameTime) / 1000);
 		
 		//act = false;
 	}

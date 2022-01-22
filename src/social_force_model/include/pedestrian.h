@@ -13,9 +13,11 @@ private:
 	static int crowdIdx;
 	int ped_id_, group_id_;
 	float radius_;
+	double t_;
 	float react_time_, desiredSpeed_;
 	double pass_possiblity_, meet_time_;
 	bool initial_ = false;
+	bool ukf_ = false;
 	std::fstream data_;
 	Color color_;
 	Point position_;
@@ -54,6 +56,7 @@ public:
 	void setLightId(int id);
 	void setPossibility(double x);
 	void setMeetTime(double t);
+	void setUKF();
 	
 	int getId() { return ped_id_; }
 	int getGroupId() { return group_id_; }
@@ -104,7 +107,8 @@ Pedestrian::Pedestrian()
 	pass_possiblity_ = 1.0;
 	color_ = fb_Color(0.0, 0.0, 0.0);
 	position_ = setPoint(0.0, 0.0, 0.0);
-	velocity_ = Eigen::Vector3d::Zero();;
+	velocity_ = Eigen::Vector3d::Zero();
+	t_ = 0;
 }
 
 Pedestrian::~Pedestrian()
@@ -174,6 +178,11 @@ void Pedestrian::setMeetTime(double t)
 	meet_time_ = t;
 }
 
+void Pedestrian::setUKF()
+{
+	ukf_ = true;
+}
+
 Point Pedestrian::getPath()
 {
 	Eigen::Vector3d dis_now, dis_next;
@@ -206,14 +215,16 @@ float Pedestrian::getOrientation()
 void Pedestrian::move(std::vector<Pedestrian *> crowd, std::vector<Wall *> walls, std::vector<Zebra *> zebras, std::vector<Traffic_light *> lights , float stepTime)
 {
 	Eigen::Vector3d acceleration;
-	static double t = 0;
+
 	acceleration = drivingForce() + pedInteractForce(crowd) + wallInteractForce(walls) + groupForce(crowd) +  zebraForce(zebras);
 	velocity_ = velocity_ + acceleration * stepTime;
 	
 	position_.x = position_.x + velocity_[0] * stepTime;
 	position_.y = position_.y + velocity_[1] * stepTime;
-	t += stepTime;
-	data_ << t << " " << position_.x << " " << position_.y << endl;
+	t_ += stepTime;
+	if (ukf_ == false)
+		data_ << t_ << " " << position_.x << " " << position_.y
+			  << " " << velocity_[0] << " " << velocity_[1] << endl;
 }
 
 Eigen::Vector3d Pedestrian::drivingForce()
@@ -312,6 +323,7 @@ Eigen::Vector3d Pedestrian::groupForce(std::vector<Pedestrian *> ped)
 		f_g = A_g_ * exp((dis_ic.norm() - radius_) * B_g_) * n_ic;
 	else
 		f_g = Eigen::Vector3d::Zero();
+	f_g.fill(0.0);
 	return f_g;
 }
 
@@ -353,6 +365,8 @@ Eigen::Vector3d Pedestrian::zebraForce(std::vector<Zebra *> zebras)
 			else
 				f_z = A_z1_ * exp(B_z1_ * dis_to_z) * e_iz;
 		}
+/*	f_z.fill(0.0);*/
+	
 	return f_z;
 }
 

@@ -123,7 +123,7 @@ Zebra::Zebra(float x, float y, int yaw)
 	color_.r = 150.0 / 255.0;
 	color_.g = 150.0 / 255.0;
 	color_.b = 150.0 / 255.0;
-	length_ = 4.0F;
+	length_ = 5.0F;
 	width_ = 0.4F;
 	interval_ = 0.4F;
 	num_ = 8;

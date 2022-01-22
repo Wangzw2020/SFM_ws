@@ -14,6 +14,7 @@ private:
 	float length_, width_, max_speed_;
 	std::vector<double> pass_possiblity_;
 	bool initial_ = false;
+	bool ukf_ = false;
 	std::fstream data_;
 	Color color_;
 	Point position_, target_position_;
@@ -34,6 +35,7 @@ public:
 	void setPosition(float x, float y, float z);
 	void setColor(float r, float g, float b);
 	void addPath(float x, float y);
+	void setUKF();
 	
 	int getId() { return car_id_; }
 	float getLength() { return length_; }
@@ -127,6 +129,11 @@ void Vehicle::addPath(float x, float y)
 	path_.push_back(p);
 }
 
+void Vehicle::setUKF()
+{
+	ukf_ = true;
+}
+
 double Vehicle::getPossibility()
 {
 	double p = 1.0;
@@ -181,7 +188,9 @@ void Vehicle::move(float stepTime)
 	position_.x += velocity_[0] * stepTime;	
 	position_.y += velocity_[1] * stepTime;
 	t += stepTime;
-	data_ << t << " " << position_.x << " " << position_.y << endl; 
+	if (ukf_ == false)
+		data_ << t << " " << position_.x << " " << position_.y
+			  << " " << velocity_[0] << " " << velocity_[1] << endl; 
 }
 
 

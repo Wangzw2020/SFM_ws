@@ -44,13 +44,13 @@ private:
 	
 	bool initialize(VectorXd initialState, MatrixXd initialStateCovariance);
 	void updateNum();
-	void setMeasurement(VectorXd measurement, MatrixXd measurementNoise, int dimention);
+	
 	MatrixXd computeSigmaPoints(VectorXd initialState, MatrixXd initialStateCovariance);
 	MatrixXd sigmaPointPrediction(MatrixXd &sigmaPoints, const double &deltaTime);
 	
 	VectorXd calculateState(VectorXd &state, MatrixXd &predictedSigmaPoints);
 	MatrixXd calculateCovariance(MatrixXd &stateCovariance, MatrixXd &predictedSigmaPoints, VectorXd &predictedState, MatrixXd &processNoise);
-	MatrixXd calculateProcessNoise(const double &deltaTime, const double &yaw);
+	MatrixXd calculateProcessNoise(const double &deltaTime);
 	
 	VectorXd setStateWeights();
 	VectorXd setCovarianceWeights();
@@ -69,6 +69,7 @@ public:
 	MatrixXd getStateCovariance() { return stateCovariance_; }
 	MatrixXd getPredictedSigmaPoints() { return predictedSigmaPoints_; }
 	MatrixXd predict(const double deltaTime);
+	void setMeasurement(VectorXd measurement, MatrixXd measurementNoise, int dimention);
 	void update();
 	bool isVectorValid(const VectorXd testVector);
 	bool doesVectorContainValues(const VectorXd testVector);
@@ -118,6 +119,9 @@ bool UKF::initialize(VectorXd firstState, Control *c)
 	if (!isVectorValid(firstState))
 		return false;
 	
+	VectorXd tmp_firstState;
+	tmp_firstState = firstState;
+	
 	ped = new Pedestrian;
 	
 	control_ = c;
@@ -135,8 +139,9 @@ bool UKF::initialize(VectorXd firstState, Control *c)
 		state_i.v_y = firstState(3+4*i);
 		all_targets_.push_back(state_i);
 		ped->setGroupId(1);
-		ped->setPosition(firstState(0+4*i), firstState(1+4*i));
-		ped->addPath(firstState(0+4*i), firstState(1+4*i) + 50);
+		ped->setPosition(tmp_firstState(0+4*i), tmp_firstState(1+4*i));
+		ped->addPath(tmp_firstState(0+4*i), tmp_firstState(1+4*i) + 50);
+		ped->setUKF();
 		control_->addPed(ped);
 	}
 	
@@ -229,15 +234,15 @@ MatrixXd UKF::predict(const double deltaTime)
 		cout << "deltaTime < 0!" << endl;
 
 	MatrixXd sigmaPoints = computeSigmaPoints(state_, stateCovariance_);
-	cout << "sigmaPoints: \n" << sigmaPoints <<endl;
+	//cout << "sigmaPoints: \n" << sigmaPoints <<endl;
 	
 	predictedSigmaPoints_ = sigmaPointPrediction(sigmaPoints, deltaTime);
-	cout << "predictedSigmaPoints: \n" << predictedSigmaPoints_ <<endl;
+	//cout << "predictedSigmaPoints: \n" << predictedSigmaPoints_ <<endl;
 
 	VectorXd predictedState = calculateState(state_, predictedSigmaPoints_);
 	cout << "predictedState: \n" << predictedState.transpose() <<endl;
 
-	MatrixXd processNoise = calculateProcessNoise(deltaTime, predictedState(2));
+	MatrixXd processNoise = calculateProcessNoise(deltaTime);
 	//cout << "processNoise: \n" << processNoise <<endl;
 
 	MatrixXd predictedStateCovariance = calculateCovariance(stateCovariance_, predictedSigmaPoints_, predictedState, processNoise);
@@ -300,10 +305,13 @@ MatrixXd UKF::sigmaPointPrediction(MatrixXd &sigmaPoints, const double &deltaTim
 	return predictedSigmaPoints;
 }
 
-MatrixXd UKF::calculateProcessNoise(const double &deltaTime, const double &yaw)
+MatrixXd UKF::calculateProcessNoise(const double &deltaTime)
 {
-	MatrixXd A(4,4);
-	A.fill(0.01);
+	MatrixXd A(stateDimension_,stateDimension_);
+	for (int i=0; i<stateDimension_; ++i)
+	{
+		A(i,i) = 0.1;
+	}
 	//???
 	return A;
 }
@@ -360,13 +368,13 @@ void UKF::update()
 	//cout << "crossCorrelation: \n" << crossCorrelation <<endl;
 	
 	if (measurementCovariance.determinant() == 0)
-        cout << "Taking the inverse of a 0 Matrix is prohibited!" << endl;
+		cout << "Taking the inverse of a 0 Matrix is prohibited!" << endl;
 
 	MatrixXd KalmanGain = crossCorrelation * measurementCovariance.inverse();
-	//cout << "KalmanGain: \n" << KalmanGain <<endl;
+	cout << "KalmanGain: \n" << KalmanGain <<endl;
 	
 	cout << "measurement state: \n" << measurementState_.transpose() <<endl;
-	measurementDifference = measurementState_ - predictedMeasurements;
+	measurementDifference = measurementState_ -  predictedMeasurements;
 	
 	VectorXd temp_state = state_;
 	temp_state += KalmanGain * measurementDifference;
