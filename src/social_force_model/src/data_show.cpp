@@ -9,7 +9,8 @@
 
 using namespace std;
 
-string ped0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped0.txt";
+//string ped0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped0.txt";
+string ped0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/a.txt";
 string car0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/car_data/car0.txt";
 
 string game_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/game.txt";
