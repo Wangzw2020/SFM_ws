@@ -97,6 +97,13 @@ Pedestrian::Pedestrian()
 	param_txt.close();
 	
 	string file_name = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped" + std::to_string(ped_id_) +".txt";
+	
+/*	if (ukf_ == false)*/
+/*	{*/
+/*		ofstream txt(file_name,ios_base::out);*/
+/*		txt.close();*/
+/*	}*/
+
 	data_.open(file_name);
 	//cout<<file_name<<endl;
 	if(!data_)
@@ -330,11 +337,11 @@ Eigen::Vector3d Pedestrian::groupForce(std::vector<Pedestrian *> ped)
 bool Pedestrian::near_zebra(std::vector<Zebra *> zebras)
 {
 	for (Zebra *zebra_i: zebras)
-		if (position_.x >= zebra_i->getLeftDown().x - 0.5 && position_.x <= zebra_i->getRightUp().x + 0.5)
-			if (position_.y >= zebra_i->getLeftDown().y -0.5 && position_.y <= zebra_i->getRightUp().y + 0.5)
+		if (position_.x >= zebra_i->getLeftDown().x - 1.0 && position_.x <= zebra_i->getRightUp().x + 1.0)
+			if (position_.y >= zebra_i->getLeftDown().y -2.0 && position_.y <= zebra_i->getRightUp().y + 2.0)
 			{
 				zebra_id_ = zebra_i->getId();
-				if (position_.x >= zebra_i->getLeftDown().x && position_.x <= zebra_i->getRightUp().x)
+				if (position_.x >= zebra_i->getLeftDown().x + 0.5 && position_.x <= zebra_i->getRightUp().x -0.5)
 					in_zebra = true;
 				else
 					in_zebra = false;

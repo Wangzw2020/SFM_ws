@@ -50,7 +50,7 @@ private:
 	
 	VectorXd calculateState(VectorXd &state, MatrixXd &predictedSigmaPoints);
 	MatrixXd calculateCovariance(MatrixXd &stateCovariance, MatrixXd &predictedSigmaPoints, VectorXd &predictedState, MatrixXd &processNoise);
-	MatrixXd calculateProcessNoise(const double &deltaTime);
+	MatrixXd calculateProcessNoise();
 	
 	VectorXd setStateWeights();
 	VectorXd setCovarianceWeights();
@@ -105,11 +105,6 @@ UKF::~UKF()
 {
 
 }
-
-/*void UKF::setControl(Control *c)*/
-/*{*/
-/*	control_ = c;*/
-/*}*/
 
 bool UKF::initialize(VectorXd firstState, Control *c)
 {
@@ -177,10 +172,15 @@ void UKF::updateNum()
 	cout << "measurement matrix: \n" << measurementMatrix_ << endl;
 	
 	stateWeights_ = setStateWeights();
+	cout << "state weights:  \n" << stateWeights_ << endl;
 	stateCovarianceWeights_ = setCovarianceWeights();
+	cout << "state covariance weights:  \n" << stateCovarianceWeights_ << endl;
 	
 	stateCovariance_.resize(stateDimension_, stateDimension_);
-	stateCovariance_ = 100 * Eigen::MatrixXd::Identity(stateDimension_, stateDimension_);
+/*	stateCovariance_ = 100 * Eigen::MatrixXd::Identity(stateDimension_, stateDimension_);*/
+	stateCovariance_ = 0.1 * Eigen::MatrixXd::Identity(stateDimension_, stateDimension_);
+	cout << "state covariance:  \n" << stateCovariance_ << endl;
+	
 	predictedSigmaPoints_.resize(stateDimension_, sigmaPointsNum_);
 	predictedSigmaPoints_.fill(0.0);
 }
@@ -188,9 +188,12 @@ void UKF::updateNum()
 void UKF::setMeasurement(VectorXd measurement, MatrixXd measurementNoise, int dimention)
 {
 	measurementState_ = measurement;
+	cout << "Measurement State : \n" << measurementState_.transpose() << endl;
 	measurementNoise_ = measurementNoise;
 	measurementDimension_ = dimention;
 	measurementSigmaPoints_ = measurementMatrix_ * predictedSigmaPoints_;
+	cout << "predicted SigmaPoints: \n" << predictedSigmaPoints_ << endl;
+	cout << "Measurement Sigma Points : \n" << measurementSigmaPoints_ << endl;
 }
 
 VectorXd UKF::setStateWeights()
@@ -242,11 +245,11 @@ MatrixXd UKF::predict(const double deltaTime)
 	VectorXd predictedState = calculateState(state_, predictedSigmaPoints_);
 	cout << "predictedState: \n" << predictedState.transpose() <<endl;
 
-	MatrixXd processNoise = calculateProcessNoise(deltaTime);
+	MatrixXd processNoise = calculateProcessNoise();
 	//cout << "processNoise: \n" << processNoise <<endl;
 
 	MatrixXd predictedStateCovariance = calculateCovariance(stateCovariance_, predictedSigmaPoints_, predictedState, processNoise);
-	//cout << "predictedStateCovariance: \n" << predictedStateCovariance <<endl;
+	cout << "predictedStateCovariance: \n" << predictedStateCovariance <<endl;
 
 	if (!(isVectorValid(predictedState) || isMatrixValid(predictedStateCovariance)))
 	{
@@ -261,7 +264,14 @@ MatrixXd UKF::predict(const double deltaTime)
 MatrixXd UKF::computeSigmaPoints(VectorXd initialState, MatrixXd initialStateCovariance)
 {
 	MatrixXd sigmaPoints(stateDimension_, sigmaPointsNum_);
-	MatrixXd squareRootMatrix = initialStateCovariance.llt().matrixL();
+/*	MatrixXd squareRootMatrix = initialStateCovariance.llt().matrixL();*/
+	MatrixXd squareRootMatrix(stateDimension_, stateDimension_);
+	squareRootMatrix.fill(0.0);
+	for (int i=0; i < stateDimension_; ++i)
+	{
+		squareRootMatrix(i,i) = 1;
+	}
+	cout << "squareRootMatrix: \n" << squareRootMatrix << endl;
 	
 	sigmaPoints.col(0) = initialState;
 	
@@ -270,6 +280,9 @@ MatrixXd UKF::computeSigmaPoints(VectorXd initialState, MatrixXd initialStateCov
 		sigmaPoints.col(i+1) = initialState + sqrt(lambda_ + stateDimension_) * squareRootMatrix.col(i);
 		sigmaPoints.col(i+1+stateDimension_) = initialState - sqrt(lambda_ + stateDimension_) * squareRootMatrix.col(i);
 	}
+	cout << "stateDimension: " << stateDimension_ << endl;
+	cout << "now state: \n" << initialState << endl;
+	cout << "sigma points: \n" << sigmaPoints << endl;
 	
 	return sigmaPoints;
 }
@@ -282,10 +295,10 @@ MatrixXd UKF::sigmaPointPrediction(MatrixXd &sigmaPoints, const double &deltaTim
 	
 	for(int i = 0; i<sigmaPointsNum_; ++i)
 	{
-		const double p_x = sigmaPoints(0,i);
-		const double p_y = sigmaPoints(1,i);
-		const double v_x = sigmaPoints(2,i);
-		const double v_y = sigmaPoints(3,i);
+		double p_x = sigmaPoints(0,i);
+		double p_y = sigmaPoints(1,i);
+		double v_x = sigmaPoints(2,i);
+		double v_y = sigmaPoints(3,i);
 		for (Pedestrian *ped : crowds)
 		{
 			ped->setPosition(p_x, p_y);
@@ -305,14 +318,14 @@ MatrixXd UKF::sigmaPointPrediction(MatrixXd &sigmaPoints, const double &deltaTim
 	return predictedSigmaPoints;
 }
 
-MatrixXd UKF::calculateProcessNoise(const double &deltaTime)
+MatrixXd UKF::calculateProcessNoise()
 {
 	MatrixXd A(stateDimension_,stateDimension_);
 	for (int i=0; i<stateDimension_; ++i)
 	{
 		A(i,i) = 0.1;
 	}
-	//???
+
 	return A;
 }
 
@@ -349,10 +362,10 @@ void UKF::update()
     crossCorrelation.fill(0.0);
 
 	predictedMeasurements = calculateState(predictedMeasurements, measurementSigmaPoints_);
-	//cout << "predictedMeasurements: \n" << predictedMeasurements <<endl;
+	cout << "predictedMeasurements: \n" << predictedMeasurements <<endl;
 
 	measurementCovariance = calculateCovariance(measurementCovariance, measurementSigmaPoints_, predictedMeasurements, measurementNoise_);
-	//cout << "measurementCovariance: \n" << measurementCovariance <<endl;
+	cout << "measurementCovariance: \n" << measurementCovariance <<endl;
 	
 	VectorXd measurementDifference(sigmaPointsNum_);
 	measurementDifference.fill(0.0);
@@ -365,7 +378,7 @@ void UKF::update()
 		stateDifference = predictedSigmaPoints_.col(i) - state_;
 		crossCorrelation += stateCovarianceWeights_(i) * stateDifference * measurementDifference.transpose();
 	}
-	//cout << "crossCorrelation: \n" << crossCorrelation <<endl;
+	cout << "crossCorrelation: \n" << crossCorrelation <<endl;
 	
 	if (measurementCovariance.determinant() == 0)
 		cout << "Taking the inverse of a 0 Matrix is prohibited!" << endl;
@@ -373,7 +386,6 @@ void UKF::update()
 	MatrixXd KalmanGain = crossCorrelation * measurementCovariance.inverse();
 	cout << "KalmanGain: \n" << KalmanGain <<endl;
 	
-	cout << "measurement state: \n" << measurementState_.transpose() <<endl;
 	measurementDifference = measurementState_ -  predictedMeasurements;
 	
 	VectorXd temp_state = state_;

@@ -211,8 +211,10 @@ void loadPed()
 		std::stringstream ss(line);
 		ss >> g_id >> x1 >> y1 >> x2 >> y2;
 		ped->setGroupId(g_id);
-		ped->setPosition(randomFloat(x1-1.0, x1+1.0), randomFloat(y1-1.0, y1+1.0));
-		ped->addPath(randomFloat(x2-1.0, x2+1.0), randomFloat(y2-1.0, y2+1.0));
+		ped->setPosition(x1, y1);
+		ped->addPath(x2, y2);
+//		ped->setPosition(randomFloat(x1-1.0, x1+1.0), randomFloat(y1-1.0, y1+1.0));
+//		ped->addPath(randomFloat(x2-1.0, x2+1.0), randomFloat(y2-1.0, y2+1.0));
 		control->addPed(ped);
 	}
 	cout<<"ped loaded!"<<endl;

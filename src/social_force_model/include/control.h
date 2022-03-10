@@ -174,8 +174,8 @@ void Control::setInitial()
 				continue;
 			car_i->setPossibility(ped_i->getId(), 0.5);
 			cout << "car initial possibility setted:" << ped_i->getId() << '\t'<< 0.5 << endl;
-			//double p = ( 4.0 - 2 * (-2.0 - ped_i->getPosition().y) + ped_i->getVelocity()[1] * ped_i->getMeetTime()) / 8.0;
-			double p = 0.5;
+			double p = ( 4.0 - 2 * (-2.0 - ped_i->getPosition().y) + ped_i->getVelocity()[1] * ped_i->getMeetTime()) / 8.0;
+			//double p = 0.5;
 			ped_i->setPossibility(p);
 			cout << "ped " << ped_i->getId() << " initial possibility setted:" << p << endl;
 		}

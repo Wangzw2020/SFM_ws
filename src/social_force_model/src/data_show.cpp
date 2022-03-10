@@ -10,8 +10,8 @@
 using namespace std;
 
 //string ped0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped0.txt";
-string ped0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/a.txt";
-string car0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/car_data/car0.txt";
+string ped0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped0.txt";
+//string car0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/car_data/car0.txt";
 
 string game_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/game.txt";
 string map_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/map.txt";
@@ -108,7 +108,7 @@ void init()				//初始化opengl
 	loadData();
 	loadMap();
 	loadLight();
-	loadVehicle();
+	//loadVehicle();
 }
 
 void loadGameMatrix()
@@ -144,7 +144,7 @@ void loadData()
 	Data data1;
 	data_file.open(ped0_txt.c_str());
 	if(!data_file)
-		cout<<"open ped0 file failed!"<<endl;
+		cout<<"open ped file failed!"<<endl;
 	while(data_file.good())
 	{
 		double t,x,y;
@@ -165,29 +165,29 @@ void loadData()
 	All_measurement_data.push_back(data1);
 	data_file.close();
 	
-	data_file.open(car0_txt.c_str());
-	Data data2;
-	if(!data_file)
-		cout << "open ped0 file failed!" << endl;
-	while(data_file.good())
-	{
-		double t,x,y;
-		Info info;
-		data2.setType(1);
-		getline(data_file, line);
-		if (line.length() == 0)
-			break;
-		std::stringstream ss(line);
+//	data_file.open(car0_txt.c_str());
+//	Data data2;
+//	if(!data_file)
+//		cout << "open car file failed!" << endl;
+//	while(data_file.good())
+//	{
+//		double t,x,y;
+//		Info info;
+//		data2.setType(1);
+//		getline(data_file, line);
+//		if (line.length() == 0)
+//			break;
+//		std::stringstream ss(line);
 
-		ss >> t >> x >> y;
-		info.time = t;
-		info.x = x;
-		info.y = y;
-		data2.addData(info);
-		data_num++;
-	}
-	All_measurement_data.push_back(data2);
-	data_file.close();
+//		ss >> t >> x >> y;
+//		info.time = t;
+//		info.x = x;
+//		info.y = y;
+//		data2.addData(info);
+//		data_num++;
+//	}
+//	All_measurement_data.push_back(data2);
+//	data_file.close();
 	cout << "all data loaded!" << endl;
 }
 
@@ -274,7 +274,7 @@ void display()
 	//画图
 	drawMap();
 	drawCrowd();
-	drawVehicle();
+	//drawVehicle();
 	drawLight();
 	
 	drawTarget();
@@ -506,12 +506,11 @@ void normalKey(unsigned char key, int xMousePos, int yMousePos) {
 }
 
 void update() {
+	
 	int currTime, frameTime;
 	static int prevTime;
 	static int actTime = 0;
 	static int i = 0;
-	static bool tracking;
-	tracking = false;
 	
 	currTime = glutGet(GLUT_ELAPSED_TIME);
 	frameTime = currTime - prevTime;
@@ -519,9 +518,9 @@ void update() {
 	
 	if (act) { 
 		actTime+=frameTime;
-//		cout << actTime << endl;
-//		if(actTime >= i * 100)
-		if(actTime >= i * 33)
+//		cout << "sim time :" << actTime << endl;
+		if(actTime >= i * 100)
+//		if(actTime >= i * 33)
 		{
 			for(int k=0; k<data_time.size(); ++k)
 			{
@@ -532,38 +531,39 @@ void update() {
 				}
 			}
 			
-			static int statedimention = (All_measurement_data.size()-1) * 4;
+			static int statedimention = (All_measurement_data.size()) * 4;
 			VectorXd state(statedimention);
 			state.fill(0.0);
 			
-			static int measurementdimention = (All_measurement_data.size()-1) * 2;
+			static int measurementdimention = (All_measurement_data.size()) * 2;
 			VectorXd measurement(measurementdimention);
 			measurement.fill(0.0);
 			
 			MatrixXd measurementnoise(measurementdimention, measurementdimention);
-			for (int i=0; i<measurementdimention; ++i)
+			for (int k=0; k<measurementdimention; ++k)
 			{
-				measurementnoise(i,i) = 10;
+				measurementnoise(k,k) = 0.1;
 			}
 			
-			for (int i=0; i<All_measurement_data.size(); ++i)
+			for (int k=0; k<All_measurement_data.size(); ++k)
 			{
-				if(All_measurement_data[i].getType() == 0)
+				if(All_measurement_data[k].getType() == 0)
 				{
-					state(0+4*i) = All_measurement_data[i].getData(flag).x + gaussian_noise(0.0, 0.1);
-					state(1+4*i) = All_measurement_data[i].getData(flag).y + gaussian_noise(0.0, 0.1);
-					measurement(0+2*i) = All_measurement_data[i].getData(flag).x + gaussian_noise(0.0, 0.1);
-					measurement(1+2*i) = All_measurement_data[i].getData(flag).y + gaussian_noise(0.0, 0.1);
+					state(0+4*k) = All_measurement_data[k].getData(flag).x + gaussian_noise(0.0, 0.1);
+					state(1+4*k) = All_measurement_data[k].getData(flag).y + gaussian_noise(0.0, 0.1);
+					measurement(0+2*k) = All_measurement_data[k].getData(flag).x + gaussian_noise(0.0, 0.1);
+					measurement(1+2*k) = All_measurement_data[k].getData(flag).y + gaussian_noise(0.0, 0.1);
 				}
 			}
+			
 			if(i == 0)
 			{
 				ukf->initialize(state, control);
 			}
 			else
 			{
-				//ukf->predict(0.100);
-				ukf->predict(0.033);
+				ukf->predict(0.100);
+//				ukf->predict(0.033);
 				ukf->setMeasurement(measurement, measurementnoise, measurement.size());
 				ukf->update();
 			}
@@ -576,56 +576,8 @@ void update() {
 				i = 0;
 				actTime = 0;
 			}
+			act = false;
 		}
-
-//		for (i=0; i<data_time.size(); ++i)
-//		{
-////			if(actTime <= i * 100)
-////				break;
-//			if(actTime <= i * 33)
-//			{
-//				tracking = true;
-//				break;
-//			}
-//			if(i == data_time.size() - 1)
-//			{
-//				actTime = 0;
-//				break;
-//			}
-//		}
-//		flag = i;
-//		if (flag >= data_num)
-//		flag = 0;
-//		
-//		VectorXd state((All_measurement_data.size()-1) * 4);
-//		state.fill(0.0);
-//		
-//		VectorXd measurement((All_measurement_data.size()-1) * 2);
-//		measurement.fill(0.0);
-//		
-//		for (int i=0; i<All_measurement_data.size(); ++i)
-//		{
-//			if(All_measurement_data[i].getType() == 0)
-//			{
-//				state(0+4*i) = All_measurement_data[i].getData(flag).x + gaussian_noise(0.0, 0.1);
-//				state(1+4*i) = All_measurement_data[i].getData(flag).y + gaussian_noise(0.0, 0.1);
-//				measurement(0+2*i) = All_measurement_data[i].getData(flag).x + gaussian_noise(0.0, 0.1);
-//				measurement(1+2*i) = All_measurement_data[i].getData(flag).y + gaussian_noise(0.0, 0.1);
-//			}
-//		}
-//		
-////		if (tracking == true)
-////		{
-////			
-////			
-////			tracking = false;
-////		}
-//		ukf->initialize(state, control);
-//		ukf->predict(static_cast<float>(frameTime) / 1000);
-		
-		
-		
-		//act = false;
 	}
 		
 	computeFPS();
