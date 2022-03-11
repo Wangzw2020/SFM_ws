@@ -11,7 +11,7 @@ using namespace std;
 
 //string ped0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped0.txt";
 string ped0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped0.txt";
-//string car0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/car_data/car0.txt";
+string car0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/car_data/car0.txt";
 
 string game_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/game.txt";
 string map_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/map.txt";
@@ -108,7 +108,7 @@ void init()				//初始化opengl
 	loadData();
 	loadMap();
 	loadLight();
-	//loadVehicle();
+	loadVehicle();
 }
 
 void loadGameMatrix()
@@ -165,29 +165,29 @@ void loadData()
 	All_measurement_data.push_back(data1);
 	data_file.close();
 	
-//	data_file.open(car0_txt.c_str());
-//	Data data2;
-//	if(!data_file)
-//		cout << "open car file failed!" << endl;
-//	while(data_file.good())
-//	{
-//		double t,x,y;
-//		Info info;
-//		data2.setType(1);
-//		getline(data_file, line);
-//		if (line.length() == 0)
-//			break;
-//		std::stringstream ss(line);
+	data_file.open(car0_txt.c_str());
+	Data data2;
+	if(!data_file)
+		cout << "open car file failed!" << endl;
+	while(data_file.good())
+	{
+		double t,x,y;
+		Info info;
+		data2.setType(1);
+		getline(data_file, line);
+		if (line.length() == 0)
+			break;
+		std::stringstream ss(line);
 
-//		ss >> t >> x >> y;
-//		info.time = t;
-//		info.x = x;
-//		info.y = y;
-//		data2.addData(info);
-//		data_num++;
-//	}
-//	All_measurement_data.push_back(data2);
-//	data_file.close();
+		ss >> t >> x >> y;
+		info.time = t;
+		info.x = x;
+		info.y = y;
+		data2.addData(info);
+		data_num++;
+	}
+	All_measurement_data.push_back(data2);
+	data_file.close();
 	cout << "all data loaded!" << endl;
 }
 
@@ -274,7 +274,7 @@ void display()
 	//画图
 	drawMap();
 	drawCrowd();
-	//drawVehicle();
+	drawVehicle();
 	drawLight();
 	
 	drawTarget();
@@ -531,18 +531,18 @@ void update() {
 				}
 			}
 			
-			static int statedimention = (All_measurement_data.size()) * 4;
+			static int statedimention = (All_measurement_data.size() - 1) * 4;
 			VectorXd state(statedimention);
 			state.fill(0.0);
 			
-			static int measurementdimention = (All_measurement_data.size()) * 2;
+			static int measurementdimention = (All_measurement_data.size() - 1) * 2;
 			VectorXd measurement(measurementdimention);
 			measurement.fill(0.0);
 			
 			MatrixXd measurementnoise(measurementdimention, measurementdimention);
 			for (int k=0; k<measurementdimention; ++k)
 			{
-				measurementnoise(k,k) = 0.1;
+				measurementnoise(k,k) = 0.01;
 			}
 			
 			for (int k=0; k<All_measurement_data.size(); ++k)

@@ -69,8 +69,12 @@ Vehicle::Vehicle() {
 		pass_possiblity_.push_back(p);
 
 	string file_name = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/car_data/car" + std::to_string(car_id_) +".txt";
-	ofstream txt(file_name,ios_base::out);
-	txt.close();
+/*	if(ukf_ == false)*/
+/*	{*/
+/*		ofstream txt(file_name,ios_base::out);*/
+/*	txt.close();*/
+/*	}*/
+
 	data_.open(file_name);
 	if(!data_)
 		std::cout << "open data file: " << file_name << " failed!" << std::endl;
