@@ -83,7 +83,8 @@ void Evolution::meet(std::vector<Pedestrian *> crowd, std::vector<Vehicle *> car
 					
 				else
 				{
-					t_ped = dis_ped.norm() / ped_i->getVelocity().norm();
+/*					t_ped = dis_ped.norm() / ped_i->getVelocity().norm();*/
+					t_ped = dis_ped.norm() / ped_i->getDesiredSpeed();
 					ped_i->setMeetTime(abs(t_ped));
 					//cout<<t_car - t_ped<<endl;
 					if (t_car - t_ped <= 1.6 && t_car - t_ped >= -1.6)

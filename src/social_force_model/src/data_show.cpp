@@ -12,10 +12,13 @@ using namespace std;
 //string ped0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped0.txt";
 string ped0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped0.txt";
 string car0_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/car_data/car0.txt";
+string save_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/ped_data/ped_ukf.txt";
 
 string game_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/game.txt";
 string map_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/map.txt";
 string light_txt = "/home/wzw/workspace/SFM_ws/src/social_force_model/src/files/lights.txt";
+
+fstream save_data;
 
 GLsizei winWidth = 1600;
 GLsizei winHeight = 900;
@@ -109,6 +112,11 @@ void init()				//初始化opengl
 	loadMap();
 	loadLight();
 	loadVehicle();
+	
+	ofstream txt(save_txt,ios_base::out);
+	txt.close();
+	save_data.open(save_txt.c_str());
+	cout << "save data opened!" << endl;
 }
 
 void loadGameMatrix()
@@ -542,17 +550,17 @@ void update() {
 			MatrixXd measurementnoise(measurementdimention, measurementdimention);
 			for (int k=0; k<measurementdimention; ++k)
 			{
-				measurementnoise(k,k) = 0.01;
+				measurementnoise(k,k) = 0.1;
 			}
 			
 			for (int k=0; k<All_measurement_data.size(); ++k)
 			{
 				if(All_measurement_data[k].getType() == 0)
 				{
-					state(0+4*k) = All_measurement_data[k].getData(flag).x + gaussian_noise(0.0, 0.1);
-					state(1+4*k) = All_measurement_data[k].getData(flag).y + gaussian_noise(0.0, 0.1);
-					measurement(0+2*k) = All_measurement_data[k].getData(flag).x + gaussian_noise(0.0, 0.1);
-					measurement(1+2*k) = All_measurement_data[k].getData(flag).y + gaussian_noise(0.0, 0.1);
+					state(0+4*k) = All_measurement_data[k].getData(flag).x + gaussian_noise(0.0, 0.05);
+					state(1+4*k) = All_measurement_data[k].getData(flag).y + gaussian_noise(0.0, 0.05);
+					measurement(0+2*k) = All_measurement_data[k].getData(flag).x + gaussian_noise(0.0, 0.05);
+					measurement(1+2*k) = All_measurement_data[k].getData(flag).y + gaussian_noise(0.0, 0.05);
 				}
 			}
 			
@@ -568,6 +576,12 @@ void update() {
 				ukf->update();
 			}
 			
+			save_data << data_time[flag] << " "
+					  << ukf->getState()(0) << " "
+					  << ukf->getState()(1) << " "
+					  << ukf->getState()(2) << " "
+					  << ukf->getState()(3) << endl;
+			
 			++i;
 			cout << "step: " << i << endl;
 			if (actTime/1000 >= data_time[data_time.size()-1])
@@ -575,8 +589,9 @@ void update() {
 				flag = 0;
 				i = 0;
 				actTime = 0;
+				act = false;
 			}
-			act = false;
+//			act = false;
 		}
 	}
 		
