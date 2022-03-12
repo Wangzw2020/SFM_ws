@@ -583,7 +583,8 @@ void update() {
 					  << ukf->getState()(3) << endl;
 			
 			++i;
-			cout << "step: " << i << endl;
+			
+			//cout << "step: " << i << endl;
 			if (actTime/1000 >= data_time[data_time.size()-1])
 			{
 				flag = 0;

@@ -190,11 +190,12 @@ void Control::computePoss(float stepTime)
 		for (Pedestrian *ped_i: crowd_)
 		{
 			evolution_->setInitial(total_time_, ped_i->getPossibility(), car_i->getPossibility(ped_i->getId()));
-			evolution_->setStep(stepTime * 5);
+/*			evolution_->setStep(stepTime * 5);*/
+			evolution_->setStep(stepTime * 5 / 10);
 			evolution_->RK4();
 			ped_i->setPossibility(evolution_->getX());
 			car_i->setPossibility(ped_i->getId(), evolution_->getY());
-			//cout<<"x1= "<< evolution_->getX() << "\ty1= " << evolution_->getY()<<endl; 
+/*			cout<<"x1= "<< evolution_->getX() << "\ny1= " << evolution_->getY()<<endl; */
 		}
 	}
 	//cout<<"computing done!"<<endl;

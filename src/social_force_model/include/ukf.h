@@ -7,6 +7,7 @@
 #include "control.h"
 
 #define debug 0
+#define state_output 0
 
 using namespace std;
 using namespace Eigen;
@@ -213,8 +214,8 @@ void UKF::updateNum()
 void UKF::setMeasurement(VectorXd measurement, MatrixXd measurementNoise, int dimention)
 {
 	measurementState_ = measurement;
-	
-	cout << "Measurement State : \n" << measurementState_.transpose() << endl;
+	if(state_output == 1)
+		cout << "Measurement State : \n" << measurementState_.transpose() << endl;
 	measurementNoise_ = measurementNoise;
 	measurementDimension_ = dimention;
 	predictedstateSigmaPoint_ = computeSigmaPoints(state_, stateCovariance_);
@@ -258,7 +259,8 @@ VectorXd UKF::setCovarianceWeights()
 
 MatrixXd UKF::predict(const double deltaTime)
 {
-	cout << "predict!" << endl;
+	if(debug == 1)
+		cout << "predict!" << endl;
 	if (!isInitialized())
 		cout << "UKF is not initialized!" << endl;
 		
@@ -274,8 +276,8 @@ MatrixXd UKF::predict(const double deltaTime)
 		cout << "predictedSigmaPoints: \n" << predictedSigmaPoints_ <<endl;
 
 	VectorXd predictedState = calculateState(state_, predictedSigmaPoints_);
-	
-	cout << "predictedState: \n" << predictedState.transpose() <<endl;
+	if(state_output == 1)
+		cout << "predictedState: \n" << predictedState.transpose() <<endl;
 
 	MatrixXd processNoise = calculateProcessNoise();
 	if(debug == 1)
@@ -450,8 +452,8 @@ void UKF::update()
 	
 	VectorXd temp_state = state_;
 	temp_state += KalmanGain * measurementDifference;
-	
-	cout << "corrected state: \n" << temp_state <<endl;
+	if(state_output == 1)
+		cout << "corrected state: \n" << temp_state <<endl;
 
 	MatrixXd temp_stateCovaiance = stateCovariance_ - (KalmanGain * measurementCovariance * KalmanGain.transpose());
 	//cout << "corrected stateCovaiance: \n" << temp_stateCovaiance <<endl;
